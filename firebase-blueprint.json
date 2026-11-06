@@ -1,0 +1,157 @@
+{
+  "entities": {
+    "Slot": {
+      "title": "Slot",
+      "description": "Public slot occupancy status for the 5 concurrent booking slots (contains zero PII).",
+      "type": "object",
+      "properties": {
+        "slotId": {
+          "type": "string",
+          "description": "Fixed slot identifier from slot-1 to slot-5.",
+          "enum": ["slot-1", "slot-2", "slot-3", "slot-4", "slot-5"],
+          "minLength": 6,
+          "maxLength": 6,
+          "pattern": "^slot-[1-5]$"
+        },
+        "occupied": {
+          "type": "boolean",
+          "description": "Whether this booking slot is currently occupied."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "UID of the user who booked this slot.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the slot was claimed."
+        }
+      },
+      "required": ["slotId", "occupied", "clientId", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Private client booking details linked 1-to-1 with one of the 5 slots.",
+      "type": "object",
+      "properties": {
+        "slotId": {
+          "type": "string",
+          "description": "Fixed slot identifier from slot-1 to slot-5.",
+          "enum": ["slot-1", "slot-2", "slot-3", "slot-4", "slot-5"],
+          "minLength": 6,
+          "maxLength": 6,
+          "pattern": "^slot-[1-5]$"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "UID of the authenticated user who submitted the booking.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "budget": {
+          "type": "string",
+          "description": "Client budget in INR.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Client phone number.",
+          "minLength": 7,
+          "maxLength": 40
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Client email address.",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "name": {
+          "type": "string",
+          "description": "Client name or business name.",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "notes": {
+          "type": "string",
+          "description": "Project notes and requirements.",
+          "minLength": 0,
+          "maxLength": 1500
+        },
+        "itemsSummary": {
+          "type": "string",
+          "description": "Summary of selected plans and belt additions.",
+          "minLength": 0,
+          "maxLength": 800
+        },
+        "cartTotal": {
+          "type": "number",
+          "description": "Calculated cart total in INR."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the booking was created."
+        }
+      },
+      "required": [
+        "slotId",
+        "clientId",
+        "budget",
+        "phoneNumber",
+        "email",
+        "name",
+        "notes",
+        "itemsSummary",
+        "cartTotal",
+        "createdAt"
+      ]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Trusted admin registry document.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Admin user UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Admin user email.",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when admin record was created."
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/slots/{slotId}": {
+      "schema": { "$ref": "#/entities/Slot" },
+      "description": "Public slot availability documents for slot-1 through slot-5 (maximum 5 slots)."
+    },
+    "/bookings/{slotId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Private booking documents for slot-1 through slot-5 (readable and deletable by admin, or readable by owner)."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Admin role lookup collection."
+    }
+  }
+}

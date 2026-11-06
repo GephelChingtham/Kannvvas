@@ -1,0 +1,6 @@
+{
+  "name": "KANVAS — Enterprise Software Architecture Studio",
+  "description": "Official architectural registry and productized engineering studio for custom enterprise digital code systems.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

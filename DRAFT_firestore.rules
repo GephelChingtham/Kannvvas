@@ -1,0 +1,114 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidSlotId(slotId) {
+      return slotId is string && slotId.size() == 6 && slotId.matches('^slot-[1-5]$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'gephelchingtham08@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidSlot(data, slotId) {
+      return data.keys().hasAll(['slotId', 'occupied', 'clientId', 'updatedAt'])
+        && data.keys().hasOnly(['slotId', 'occupied', 'clientId', 'updatedAt'])
+        && data.slotId is string && data.slotId.size() == 6 && data.slotId == slotId
+        && data.occupied is bool && data.occupied == true
+        && data.clientId is string && data.clientId.size() >= 1 && data.clientId.size() <= 128 && data.clientId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.clientId == request.auth.uid
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidBooking(data, slotId) {
+      return data.keys().hasAll(['slotId', 'clientId', 'budget', 'phoneNumber', 'email', 'name', 'notes', 'itemsSummary', 'cartTotal', 'createdAt'])
+        && data.keys().hasOnly(['slotId', 'clientId', 'budget', 'phoneNumber', 'email', 'name', 'notes', 'itemsSummary', 'cartTotal', 'createdAt'])
+        && data.slotId is string && data.slotId.size() == 6 && data.slotId == slotId
+        && data.clientId is string && data.clientId.size() >= 1 && data.clientId.size() <= 128 && data.clientId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.clientId == request.auth.uid
+        && data.budget is string && data.budget.size() >= 1 && data.budget.size() <= 120
+        && data.phoneNumber is string && data.phoneNumber.size() >= 7 && data.phoneNumber.size() <= 40
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.name is string && data.name.size() <= 160
+        && data.notes is string && data.notes.size() <= 1500
+        && data.itemsSummary is string && data.itemsSummary.size() <= 800
+        && data.cartTotal is number && data.cartTotal >= 0 && data.cartTotal <= 100000000
+        && data.createdAt is timestamp && data.createdAt == request.time;
+    }
+
+    function isValidAdmin(data, adminId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt'])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == adminId
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.createdAt is timestamp && data.createdAt == request.time;
+    }
+
+    // Public Slot Occupancy (slot-1 through slot-5 only, zero PII)
+    match /slots/{slotId} {
+      allow get: if isValidSlotId(slotId);
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isValidSlotId(slotId)
+        && isValidSlot(incoming(), slotId)
+        && existsAfter(/databases/$(database)/documents/bookings/$(slotId));
+      allow update: if false;
+      allow delete: if isValidSlotId(slotId)
+        && isAdmin()
+        && !existsAfter(/databases/$(database)/documents/bookings/$(slotId));
+    }
+
+    // Private Booking Details (slot-1 through slot-5 only, contains PII)
+    match /bookings/{slotId} {
+      allow get: if isValidSlotId(slotId) && (
+        isAdmin() || (isVerifiedUser() && existing().clientId == request.auth.uid)
+      );
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isValidSlotId(slotId)
+        && isValidBooking(incoming(), slotId)
+        && existsAfter(/databases/$(database)/documents/slots/$(slotId));
+      allow update: if false;
+      allow delete: if isValidSlotId(slotId)
+        && isAdmin()
+        && !existsAfter(/databases/$(database)/documents/slots/$(slotId));
+    }
+
+    // Trusted Admin Registry
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isVerifiedUser() && request.auth.uid == adminId;
+      allow list: if false;
+      allow create: if isValidId(adminId) && isValidAdmin(incoming(), adminId) && isAdmin();
+      allow update: if false;
+      allow delete: if isValidId(adminId) && isAdmin();
+    }
+  }
+}
