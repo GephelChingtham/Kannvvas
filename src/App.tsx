@@ -4,7 +4,23 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ArrowUpRight, Check, Lock, LogIn, LogOut, ShoppingBag, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Check,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  LogIn,
+  LogOut,
+  Mail,
+  Phone,
+  RefreshCw,
+  ShoppingBag,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   doc,
@@ -39,6 +55,8 @@ import {
 const CREDENTIALS_URL =
   'https://www.coursera.org/account/accomplishments/verify/895RXPX2DHPY?utm_source=link&utm_medium=certificate&utm_content=cert_image&utm_campaign=sharing_cta&utm_product=course';
 
+const REQUIRED_PASSCODE = 'Zayden@08';
+
 interface BookingRecord {
   slotId: SlotId;
   clientId: string;
@@ -57,6 +75,30 @@ function formatINR(amount: number): string {
 }
 
 export default function App() {
+  // Client-Side Routing: Detect /admin or #admin
+  const [pathname, setPathname] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      const h = window.location.hash;
+      if (p.startsWith('/admin') || h.includes('admin')) {
+        return '/admin';
+      }
+      return p || '/';
+    }
+    return '/';
+  });
+
+  // Admin Passcode Gate (Zayden@08)
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
+  const [passcodeError, setPasscodeError] = useState<string | null>(null);
+  const [isPasscodeUnlocked, setIsPasscodeUnlocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('kannvvas_admin_unlocked') === 'true';
+    }
+    return false;
+  });
+
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [cartAddOnIds, setCartAddOnIds] = useState<string[]>([]);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
@@ -103,6 +145,33 @@ export default function App() {
 
   const occupiedCount = SLOT_IDS.filter((id) => occupiedSlots[id]).length;
   const isAtCapacity = occupiedCount >= MAX_BOOKINGS;
+
+  // Handle URL change / Browser back & forward
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      const h = window.location.hash;
+      if (p.startsWith('/admin') || h.includes('admin')) {
+        setPathname('/admin');
+      } else {
+        setPathname(p || '/');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', path);
+      setPathname(path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Listen to Auth State
   useEffect(() => {
@@ -343,10 +412,378 @@ export default function App() {
     }
   };
 
-  const activeAdminBookingsList = SLOT_IDS.map((slotId) => adminBookings[slotId]).filter(
-    (b): b is BookingRecord => b !== null
-  );
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasscodeError(null);
+    if (passcodeInput === REQUIRED_PASSCODE) {
+      setIsPasscodeUnlocked(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('kannvvas_admin_unlocked', 'true');
+      }
+      setPasscodeInput('');
+    } else {
+      setPasscodeError('Invalid passcode. Access denied.');
+    }
+  };
 
+  const handleLockAdmin = () => {
+    setIsPasscodeUnlocked(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('kannvvas_admin_unlocked');
+    }
+  };
+
+  const activeAdminBookingsList = SLOT_IDS.map((slotId) => ({
+    slotId,
+    occupied: occupiedSlots[slotId],
+    booking: adminBookings[slotId],
+  }));
+
+  // ==========================================
+  // DEDICATED ADMIN PORTAL VIEW (/admin)
+  // ==========================================
+  if (pathname === '/admin') {
+    return (
+      <div className="min-h-screen bg-[#121214] text-[#FDFBF7] selection:bg-[#C2D8C4] selection:text-[#121214] flex flex-col font-sans">
+        {/* TOP ADMIN HEADER */}
+        <header className="border-b border-[#FDFBF7]/15 bg-[#121214]/90 backdrop-blur-sm sticky top-0 z-30">
+          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs font-black tracking-widest uppercase bg-[#FDFBF7] text-[#121214] px-2 py-0.5">
+                KANNVVAS
+              </span>
+              <span className="font-mono text-xs text-[#FDFBF7]/60 tracking-wider">
+                /admin portal
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigateTo('/')}
+                className="inline-flex items-center gap-1.5 text-xs font-mono text-[#FDFBF7]/70 hover:text-[#FDFBF7] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Return to Site</span>
+              </button>
+
+              {isPasscodeUnlocked && (
+                <button
+                  type="button"
+                  onClick={handleLockAdmin}
+                  className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] bg-transparent text-[#FDFBF7] px-3 py-1.5 text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  Lock
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* PASSCODE GATE: Zayden@08 */}
+        {!isPasscodeUnlocked ? (
+          <main className="flex-1 flex items-center justify-center p-6">
+            <div className="max-w-md w-full border border-[#FDFBF7]/20 bg-[#1A1C1A] p-8 sm:p-10 shadow-2xl space-y-6">
+              <div className="space-y-2 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 border border-[#FDFBF7]/30 bg-[#121214] text-[#FDFBF7] mb-2">
+                  <KeyRound className="w-6 h-6" />
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#FDFBF7]">
+                  Admin Authorization
+                </h1>
+                <p className="text-xs font-mono text-[#FDFBF7]/60 tracking-wide">
+                  https://kannvvas.vercel.app/admin
+                </p>
+              </div>
+
+              {passcodeError && (
+                <div className="p-3 border border-red-500/50 bg-red-950/40 text-red-300 text-xs font-mono text-center">
+                  {passcodeError}
+                </div>
+              )}
+
+              <form onSubmit={handlePasscodeSubmit} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="admin-passcode-input"
+                    className="block text-xs font-mono uppercase tracking-widest text-[#FDFBF7]/70 mb-2"
+                  >
+                    Enter Passcode
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="admin-passcode-input"
+                      type={showPasscode ? 'text' : 'password'}
+                      autoFocus
+                      required
+                      value={passcodeInput}
+                      onChange={(e) => {
+                        setPasscodeInput(e.target.value);
+                        setPasscodeError(null);
+                      }}
+                      placeholder="•••••••••"
+                      className="w-full bg-[#121214] border border-[#FDFBF7]/30 focus:border-[#FDFBF7] text-[#FDFBF7] px-4 py-3 text-sm font-mono tracking-wider outline-none rounded-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasscode((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDFBF7]/60 hover:text-[#FDFBF7] p-1 cursor-pointer"
+                    >
+                      {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#FDFBF7] text-[#121214] font-black uppercase text-xs tracking-widest py-3.5 hover:bg-[#C2D8C4] transition-colors cursor-pointer"
+                >
+                  Verify Passcode →
+                </button>
+              </form>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigateTo('/')}
+                  className="text-xs font-mono text-[#FDFBF7]/50 hover:text-[#FDFBF7] underline underline-offset-4 cursor-pointer"
+                >
+                  ← Back to Kannvvas Studio
+                </button>
+              </div>
+            </div>
+          </main>
+        ) : (
+          /* UNLOCKED ADMIN DASHBOARD */
+          <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-10 space-y-8">
+            {/* TOP BAR / STATS */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#FDFBF7]/15 pb-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-mono text-xs uppercase tracking-widest text-[#FDFBF7]/70">
+                    Live System Status
+                  </span>
+                </div>
+                <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[#FDFBF7] mt-1">
+                  Active Bookings Pipeline
+                </h1>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs uppercase tracking-wider border border-[#FDFBF7]/30 px-3 py-1.5 bg-[#1A1C1A]">
+                  Slots: <strong className="text-[#C2D8C4]">{occupiedCount}</strong> / {MAX_BOOKINGS}
+                </span>
+
+                {user ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-[#FDFBF7]/60 hidden sm:inline">
+                      {user.email}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => signOut(auth)}
+                      className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] px-3 py-1.5 text-xs font-mono uppercase tracking-wider cursor-pointer"
+                    >
+                      Sign Out Google
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAdminSignIn}
+                    className="inline-flex items-center gap-2 bg-[#FDFBF7] text-[#121214] px-4 py-2 text-xs font-mono font-bold tracking-wider uppercase hover:bg-[#C2D8C4] cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sync Google Admin</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {adminError && (
+              <div className="p-3 border border-red-500/50 bg-red-950/40 text-red-300 text-xs font-mono">
+                {adminError}
+              </div>
+            )}
+
+            {!user ? (
+              <div className="border border-[#FDFBF7]/20 bg-[#1A1C1A] p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <p className="text-sm font-bold text-[#FDFBF7]">
+                    Passcode verified ({REQUIRED_PASSCODE})
+                  </p>
+                  <p className="text-xs font-mono text-[#FDFBF7]/60">
+                    Connect your admin Google account ({ADMIN_EMAIL}) to unlock real-time Firestore database reads and clear slots.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAdminSignIn}
+                  className="bg-[#C2D8C4] text-[#121214] font-black uppercase text-xs tracking-widest px-5 py-3 whitespace-nowrap hover:bg-[#FDFBF7] cursor-pointer"
+                >
+                  Connect {ADMIN_EMAIL}
+                </button>
+              </div>
+            ) : !isAdminUser ? (
+              <div className="border border-amber-500/50 bg-amber-950/30 p-6 space-y-2">
+                <p className="text-sm font-bold text-amber-300">
+                  Logged in as {user.email} (Not Registered as Firebase Admin)
+                </p>
+                <p className="text-xs font-mono text-[#FDFBF7]/70">
+                  Make sure you sign in with the official admin email ({ADMIN_EMAIL}) to access client PII and modify slots.
+                </p>
+              </div>
+            ) : null}
+
+            {/* 5-SLOT ARCHITECTURAL PIPELINE */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-mono uppercase tracking-widest text-[#FDFBF7]/70">
+                  Current 5 Client Slots
+                </h2>
+                <span className="text-xs font-mono text-[#FDFBF7]/50">
+                  Strict Limit: 5 simultaneous builds
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {activeAdminBookingsList.map(({ slotId, occupied, booking }, index) => {
+                  const slotLabel = `SLOT 0${index + 1}`;
+
+                  if (!occupied) {
+                    return (
+                      <div
+                        key={slotId}
+                        className="border border-dashed border-[#FDFBF7]/25 bg-[#121214]/60 p-6 flex flex-col justify-between min-h-[260px]"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-4">
+                            <span className="font-mono text-xs font-bold text-[#FDFBF7]/50">
+                              {slotLabel}
+                            </span>
+                            <span className="font-mono text-[11px] text-emerald-400 bg-emerald-950/50 border border-emerald-500/40 px-2 py-0.5">
+                              OPEN
+                            </span>
+                          </div>
+                          <p className="text-base font-bold text-[#FDFBF7]/80">Available</p>
+                          <p className="text-xs font-mono text-[#FDFBF7]/40 mt-1">
+                            Ready for next client off the sushi belt.
+                          </p>
+                        </div>
+
+                        <div className="pt-4 border-t border-[#FDFBF7]/10">
+                          <span className="text-[11px] font-mono text-[#FDFBF7]/40">
+                            ID: {slotId}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={slotId}
+                      className="border border-[#C2D8C4]/60 bg-[#1A1C1A] p-6 flex flex-col justify-between space-y-4 min-h-[260px] shadow-lg"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#FDFBF7]/15">
+                          <span className="font-mono text-xs font-black text-[#C2D8C4] tracking-wider">
+                            {slotLabel}
+                          </span>
+                          <span className="font-mono text-[11px] font-bold bg-[#C2D8C4] text-[#121214] px-2.5 py-0.5 uppercase">
+                            BOOKED
+                          </span>
+                        </div>
+
+                        {booking ? (
+                          <div className="space-y-2 text-xs font-mono">
+                            <div>
+                              <p className="text-base font-bold text-[#FDFBF7] font-sans">
+                                {booking.name || 'Unnamed Client'}
+                              </p>
+                              <p className="text-sm font-black text-[#C2D8C4] mt-0.5">
+                                Budget: {booking.budget}
+                              </p>
+                            </div>
+
+                            <div className="space-y-1 pt-1 text-[#FDFBF7]/80">
+                              <p className="flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-[#C2D8C4]" />
+                                <a
+                                  href={`tel:${booking.phoneNumber}`}
+                                  className="hover:underline"
+                                >
+                                  {booking.phoneNumber}
+                                </a>
+                                <a
+                                  href={`https://wa.me/${booking.phoneNumber.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ml-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2"
+                                >
+                                  WhatsApp
+                                </a>
+                              </p>
+
+                              <p className="flex items-center gap-1.5">
+                                <Mail className="w-3.5 h-3.5 text-[#C2D8C4]" />
+                                <a
+                                  href={`mailto:${booking.email}`}
+                                  className="hover:underline truncate"
+                                >
+                                  {booking.email}
+                                </a>
+                              </p>
+                            </div>
+
+                            {booking.itemsSummary && (
+                              <div className="pt-2 border-t border-[#FDFBF7]/10 text-[11px] text-[#FDFBF7]/70">
+                                <strong className="text-[#FDFBF7] block">
+                                  Items ({formatINR(booking.cartTotal)}):
+                                </strong>
+                                <span className="line-clamp-2">{booking.itemsSummary}</span>
+                              </div>
+                            )}
+
+                            {booking.notes && (
+                              <div className="pt-2 border-t border-[#FDFBF7]/10 text-[11px] text-[#FDFBF7]/60">
+                                <strong className="text-[#FDFBF7] block">Notes:</strong>
+                                <p className="line-clamp-3">{booking.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-xs font-mono text-[#FDFBF7]/60">
+                            Occupied slot. Sign in with Google ({ADMIN_EMAIL}) above to load client PII details.
+                          </div>
+                        )}
+                      </div>
+
+                      {isAdminUser && (
+                        <button
+                          type="button"
+                          onClick={() => handleAdminDeleteBooking(slotId)}
+                          className="w-full inline-flex items-center justify-center gap-2 border border-red-500/50 hover:bg-red-950/40 text-red-300 py-2.5 px-3 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Clear Booking &amp; Free Slot</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </main>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // PUBLIC WEBSITE (/)
+  // ==========================================
   return (
     <div className="min-h-screen bg-[#C2D8C4] text-[#121214] selection:bg-[#121214] selection:text-[#FDFBF7]">
       {/* HEADER */}
@@ -384,13 +821,6 @@ export default function App() {
               className="text-xs font-bold text-[#121214] hover:underline underline-offset-4 cursor-pointer"
             >
               Belt
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToSection('admin')}
-              className="text-xs font-bold text-[#121214] hover:underline underline-offset-4 cursor-pointer"
-            >
-              Admin
             </button>
             <a
               href={CREDENTIALS_URL}
@@ -892,132 +1322,38 @@ export default function App() {
             )}
           </div>
         </section>
-
-        {/* 7. ADMIN SECTION — SHOWING ALL BOOKINGS (MAX 5 PER TIME) */}
-        <section id="admin" className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="bg-[#FDFBF7] border border-[#121214] p-7 sm:p-10">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#121214]/15">
-              <div>
-                <p className="text-xs font-mono uppercase tracking-widest text-[#3A403C] mb-1">
-                  Admin Section
-                </p>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tighter text-[#121214]">
-                  Active Bookings ({occupiedCount} / {MAX_BOOKINGS})
-                </h2>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {user ? (
-                  <>
-                    <span className="text-xs font-mono text-[#3A403C] hidden sm:inline">
-                      {user.email}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => signOut(auth)}
-                      className="inline-flex items-center gap-1.5 border border-[#121214] bg-[#FDFBF7] px-3.5 py-2 text-xs font-bold uppercase tracking-widest text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out</span>
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleAdminSignIn}
-                    className="inline-flex items-center gap-1.5 bg-[#121214] text-[#FDFBF7] px-4 py-2.5 text-xs font-black uppercase tracking-widest cursor-pointer"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Admin Sign In</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {adminError && (
-              <div className="mt-4 p-3 border border-[#121214] bg-[#C2D8C4]/40 text-xs font-mono text-[#121214]">
-                {adminError}
-              </div>
-            )}
-
-            {!user ? (
-              <div className="py-10 flex flex-col items-center justify-center text-center gap-3">
-                <Lock className="w-6 h-6 text-[#121214]" />
-                <p className="text-sm font-bold text-[#121214]">
-                  Sign in with your admin Google account to view and manage all 5 booking slots.
-                </p>
-              </div>
-            ) : !isAdminUser ? (
-              <div className="py-10 flex flex-col items-center justify-center text-center gap-2">
-                <Lock className="w-6 h-6 text-[#121214]" />
-                <p className="text-sm font-bold text-[#121214]">
-                  Signed in as {user.email} (Not an Admin).
-                </p>
-                <p className="text-xs text-[#3A403C]">
-                  Only authorized admins can view client bookings.
-                </p>
-              </div>
-            ) : activeAdminBookingsList.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-sm font-mono text-[#3A403C]">
-                  0 / 5 bookings right now. All 5 slots are open.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {activeAdminBookingsList.map((b) => (
-                  <div
-                    key={b.slotId}
-                    className="border border-[#121214] bg-[#C2D8C4]/25 p-5 flex flex-col justify-between gap-4"
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="bg-[#121214] text-[#FDFBF7] px-2.5 py-0.5 text-[11px] font-mono font-bold uppercase">
-                          {b.slotId.toUpperCase()}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-[#121214]">
-                          Budget: {b.budget}
-                        </span>
-                      </div>
-
-                      <div className="text-xs space-y-1">
-                        <p className="font-bold text-sm text-[#121214]">
-                          {b.name || 'Unnamed Client'}
-                        </p>
-                        <p className="font-mono text-[#121214]">Phone: {b.phoneNumber}</p>
-                        <p className="font-mono text-[#121214]">Email: {b.email}</p>
-                      </div>
-
-                      {b.itemsSummary && (
-                        <div className="border-t border-[#121214]/15 pt-2 text-xs font-mono text-[#121214]">
-                          <span className="font-bold block">Selected Items ({formatINR(b.cartTotal)}):</span>
-                          <span className="text-[#3A403C]">{b.itemsSummary}</span>
-                        </div>
-                      )}
-
-                      {b.notes && (
-                        <div className="border-t border-[#121214]/15 pt-2 text-xs text-[#3A403C]">
-                          <span className="font-bold text-[#121214] block">Notes:</span>
-                          {b.notes}
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAdminDeleteBooking(b.slotId)}
-                      className="inline-flex items-center justify-center gap-1.5 border border-[#121214] bg-[#FDFBF7] py-2 px-3 text-xs font-bold uppercase tracking-widest text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Clear Booking &amp; Free Slot</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
       </main>
+
+      {/* FOOTER */}
+      <footer className="border-t-[0.5px] border-[#121214]/15">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-[#3A403C]">
+          <div className="flex items-center gap-4">
+            <span className="font-black text-[#121214]">KANNVVAS</span>
+            <span>Enterprise Software Studio</span>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <a
+              href={CREDENTIALS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-bold text-[#121214] hover:underline"
+            >
+              <span>Our credentials</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => navigateTo('/admin')}
+              className="text-[#3A403C] hover:text-[#121214] hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Admin Console</span>
+            </button>
+          </div>
+        </div>
+      </footer>
 
       {/* SLIDE-OVER CART DRAWER */}
       {isCartDrawerOpen && (
