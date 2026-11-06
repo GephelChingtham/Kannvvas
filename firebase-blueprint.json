@@ -34,7 +34,7 @@
     },
     "Booking": {
       "title": "Booking",
-      "description": "Private client booking details linked 1-to-1 with one of the 5 slots.",
+      "description": "Private client booking details linked 1-to-1 with one of the 5 slots, including the 6-question design intake answers.",
       "type": "object",
       "properties": {
         "slotId": {
@@ -92,6 +92,42 @@
         "cartTotal": {
           "type": "number",
           "description": "Calculated cart total in INR."
+        },
+        "q1BrandPersonality": {
+          "type": "string",
+          "description": "Q1: Brand personality selected options (up to 3).",
+          "minLength": 0,
+          "maxLength": 400
+        },
+        "q2FavoriteWebsites": {
+          "type": "string",
+          "description": "Q2: 2-3 favorite websites and reasons.",
+          "minLength": 0,
+          "maxLength": 1500
+        },
+        "q3PrimaryGoal": {
+          "type": "string",
+          "description": "Q3: #1 action for visitors within 5 seconds.",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "q4ContentReliance": {
+          "type": "string",
+          "description": "Q4: Content reliance and types.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "q5TargetAudience": {
+          "type": "string",
+          "description": "Q5: Primary target customer and tech savviness.",
+          "minLength": 0,
+          "maxLength": 400
+        },
+        "q6VisualAssetsScope": {
+          "type": "string",
+          "description": "Q6: Scope of visual assets ready for day one.",
+          "minLength": 0,
+          "maxLength": 400
         },
         "createdAt": {
           "type": "string",

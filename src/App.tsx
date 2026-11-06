@@ -6,18 +6,22 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   Check,
+  ChevronDown,
+  ChevronUp,
   Eye,
   EyeOff,
+  FileText,
   KeyRound,
   Lock,
   LogIn,
   LogOut,
   Mail,
   Phone,
-  RefreshCw,
   ShoppingBag,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -57,6 +61,45 @@ const CREDENTIALS_URL =
 
 const REQUIRED_PASSCODE = 'Zayden@08';
 
+// ==========================================
+// INTAKE QUESTIONNAIRE CONSTANTS
+// ==========================================
+const Q1_OPTIONS = [
+  'Bold & Disruptive (Energetic, high-contrast, modern)',
+  'Premium & Luxurious (Sophisticated, minimalist, high-end)',
+  'Friendly & Approachable (Warm, creative, community-focused)',
+  'Corporate & Trustworthy (Professional, secure, data-driven)',
+  'Technical & Cutting-Edge (SaaS, developer-focused, futuristic)',
+  'Calm & Organic (Eco-friendly, wellness-oriented, soft tones)',
+];
+
+const Q3_OPTIONS = [
+  'Book a call / Schedule a demo (Lead generation focus)',
+  'Purchase a product (E-commerce / transaction focus)',
+  'Sign up for a free trial / Create an account (SaaS product focus)',
+  'Read our content / View our work (Portfolio / publisher focus)',
+  'Contact us / Fill out a quote form (Local business / service focus)',
+];
+
+const Q4_OPTIONS = [
+  'Text-Heavy: Deep-dive blogs, whitepapers, case studies, or documentation.',
+  'Visual-Heavy: High-resolution product images, video backgrounds, or design portfolios.',
+  'Transaction-Heavy: Complex pricing grids, booking systems, or large e-commerce catalogs.',
+  'Minimal Content: Simple, straight-to-the-point landing page with just core business details.',
+];
+
+const Q5_OPTIONS = [
+  'Non-technical / Traditional: Needs ultra-simple, predictable navigation and highly readable fonts (e.g., enterprise executives, seniors, general consumers).',
+  'Moderately Tech-Savvy: Comfortable with standard modern web layouts, interactive sliders, and typical SaaS layouts (e.g., everyday professionals, B2B buyers).',
+  'Highly Tech-Savvy / Early Adopters: Expects experimental design, micro-animations, dark mode, and cutting-edge visual trends (e.g., developers, creatives, Gen-Z).',
+];
+
+const Q6_OPTIONS = [
+  'Fully Loaded: We have custom, high-end professional photography and brand illustrations ready.',
+  'Text Only: We do not have high-quality photos yet; we will rely heavily on typography, clean layouts, and vector/stock icons.',
+  'Hybrid: We have standard team photos or basic product screenshots, but will need high-quality stock photography to fill the gaps.',
+];
+
 interface BookingRecord {
   slotId: SlotId;
   clientId: string;
@@ -67,6 +110,12 @@ interface BookingRecord {
   notes: string;
   itemsSummary: string;
   cartTotal: number;
+  q1BrandPersonality?: string;
+  q2FavoriteWebsites?: string;
+  q3PrimaryGoal?: string;
+  q4ContentReliance?: string;
+  q5TargetAudience?: string;
+  q6VisualAssetsScope?: string;
   createdAt?: Timestamp | null;
 }
 
@@ -124,16 +173,29 @@ export default function App() {
     'slot-5': null,
   });
 
-  // Booking Form State
+  // Booking Form State - Contact & Basics
   const [budget, setBudget] = useState('');
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Booking Form State - 6 Intake Questions
+  const [q1Selected, setQ1Selected] = useState<string[]>([]);
+  const [q2Websites, setQ2Websites] = useState('');
+  const [q3Goal, setQ3Goal] = useState('');
+  const [q4Content, setQ4Content] = useState<string[]>([]);
+  const [q5Audience, setQ5Audience] = useState('');
+  const [q6Assets, setQ6Assets] = useState('');
+
+  // Active step in booking: 1 = Basic Details, 2 = Intake Questionnaire
+  const [bookingStep, setBookingStep] = useState<1 | 2>(1);
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [expandedIntakeSlot, setExpandedIntakeSlot] = useState<SlotId | null>(null);
 
   const selectedPlans = PLANS.filter((p) => selectedPlanIds.includes(p.id));
   const selectedAddOns = CORE_ADDONS.filter((a) => cartAddOnIds.includes(a.id));
@@ -293,31 +355,66 @@ export default function App() {
     }
   };
 
+  const toggleQ1 = (opt: string) => {
+    setQ1Selected((prev) => {
+      if (prev.includes(opt)) {
+        return prev.filter((x) => x !== opt);
+      }
+      if (prev.length >= 3) {
+        return [...prev.slice(1), opt];
+      }
+      return [...prev, opt];
+    });
+  };
+
+  const toggleQ4 = (opt: string) => {
+    setQ4Content((prev) =>
+      prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+    );
+  };
+
+  const validateStep1 = () => {
+    setError(null);
+    if (isAtCapacity) {
+      setError('All 5 booking slots are currently full (5/5).');
+      return false;
+    }
+    const cleanBudget = budget.trim().slice(0, 120);
+    if (!cleanBudget) {
+      setError('Please enter your budget.');
+      return false;
+    }
+    const cleanPhone = phoneNumber.trim().slice(0, 40);
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 7 || digitsOnly.length < 7) {
+      setError('Please enter a valid phone number.');
+      return false;
+    }
+    const cleanEmail = email.trim().slice(0, 160);
+    if (cleanEmail.length < 3 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleProceedToIntake = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateStep1()) {
+      setBookingStep(2);
+      const intakeElement = document.getElementById('intake-questionnaire');
+      if (intakeElement) {
+        intakeElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (isAtCapacity) {
-      setError('All 5 booking slots are currently full (5/5).');
-      return;
-    }
-
-    const cleanBudget = budget.trim().slice(0, 120);
-    if (!cleanBudget) {
-      setError('Enter your budget.');
-      return;
-    }
-
-    const cleanPhone = phoneNumber.trim().slice(0, 40);
-    const digitsOnly = cleanPhone.replace(/\D/g, '');
-    if (cleanPhone.length < 7 || digitsOnly.length < 7) {
-      setError('Enter your phone number.');
-      return;
-    }
-
-    const cleanEmail = email.trim().slice(0, 160);
-    if (cleanEmail.length < 3 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setError('Enter a valid email.');
+    if (!validateStep1()) {
+      setBookingStep(1);
       return;
     }
 
@@ -336,7 +433,7 @@ export default function App() {
       }
 
       if (!activeUser) {
-        setError('Please sign in with Google to confirm your booking.');
+        setError('Please sign in with Google to confirm and save your booking.');
         setSubmitting(false);
         return;
       }
@@ -355,16 +452,23 @@ export default function App() {
         clientId: activeUser.uid,
         updatedAt: serverTimestamp(),
       });
+
       batch.set(doc(db, 'bookings', freeSlotId), {
         slotId: freeSlotId,
         clientId: activeUser.uid,
-        budget: cleanBudget,
-        phoneNumber: cleanPhone,
-        email: cleanEmail,
+        budget: budget.trim().slice(0, 120),
+        phoneNumber: phoneNumber.trim().slice(0, 40),
+        email: email.trim().slice(0, 160),
         name: name.trim().slice(0, 160),
         notes: notes.trim().slice(0, 1500),
         itemsSummary,
         cartTotal: Math.min(Math.max(0, cartTotal), 100000000),
+        q1BrandPersonality: q1Selected.join(' | ').slice(0, 400),
+        q2FavoriteWebsites: q2Websites.trim().slice(0, 1500),
+        q3PrimaryGoal: q3Goal.slice(0, 300),
+        q4ContentReliance: q4Content.join(' | ').slice(0, 500),
+        q5TargetAudience: q5Audience.slice(0, 400),
+        q6VisualAssetsScope: q6Assets.slice(0, 400),
         createdAt: serverTimestamp(),
       });
 
@@ -375,11 +479,18 @@ export default function App() {
       }
 
       setSubmitted(true);
+      setBookingStep(1);
       setBudget('');
       setPhoneNumber('');
       setEmail('');
       setName('');
       setNotes('');
+      setQ1Selected([]);
+      setQ2Websites('');
+      setQ3Goal('');
+      setQ4Content([]);
+      setQ5Audience('');
+      setQ6Assets('');
     } catch (err) {
       if (err instanceof Error && err.message.includes('auth/popup-closed-by-user')) {
         setError('Sign-in popup was closed before completing your booking.');
@@ -566,7 +677,7 @@ export default function App() {
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[#FDFBF7] mt-1">
-                  Active Bookings Pipeline
+                  Active Bookings &amp; Questionnaire Intake
                 </h1>
               </div>
 
@@ -614,7 +725,7 @@ export default function App() {
                     Passcode verified ({REQUIRED_PASSCODE})
                   </p>
                   <p className="text-xs font-mono text-[#FDFBF7]/60">
-                    Connect your admin Google account ({ADMIN_EMAIL}) to unlock real-time Firestore database reads and clear slots.
+                    Connect your admin Google account ({ADMIN_EMAIL}) to unlock real-time Firestore database reads and manage questionnaire answers.
                   </p>
                 </div>
                 <button
@@ -631,7 +742,7 @@ export default function App() {
                   Logged in as {user.email} (Not Registered as Firebase Admin)
                 </p>
                 <p className="text-xs font-mono text-[#FDFBF7]/70">
-                  Make sure you sign in with the official admin email ({ADMIN_EMAIL}) to access client PII and modify slots.
+                  Make sure you sign in with the official admin email ({ADMIN_EMAIL}) to view client intake answers.
                 </p>
               </div>
             ) : null}
@@ -647,15 +758,16 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activeAdminBookingsList.map(({ slotId, occupied, booking }, index) => {
                   const slotLabel = `SLOT 0${index + 1}`;
+                  const isIntakeOpen = expandedIntakeSlot === slotId;
 
                   if (!occupied) {
                     return (
                       <div
                         key={slotId}
-                        className="border border-dashed border-[#FDFBF7]/25 bg-[#121214]/60 p-6 flex flex-col justify-between min-h-[260px]"
+                        className="border border-dashed border-[#FDFBF7]/25 bg-[#121214]/60 p-6 flex flex-col justify-between min-h-[280px]"
                       >
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-4">
@@ -684,7 +796,7 @@ export default function App() {
                   return (
                     <div
                       key={slotId}
-                      className="border border-[#C2D8C4]/60 bg-[#1A1C1A] p-6 flex flex-col justify-between space-y-4 min-h-[260px] shadow-lg"
+                      className="border border-[#C2D8C4]/60 bg-[#1A1C1A] p-6 flex flex-col justify-between space-y-4 min-h-[280px] shadow-lg"
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#FDFBF7]/15">
@@ -697,7 +809,7 @@ export default function App() {
                         </div>
 
                         {booking ? (
-                          <div className="space-y-2 text-xs font-mono">
+                          <div className="space-y-3 text-xs font-mono">
                             <div>
                               <p className="text-base font-bold text-[#FDFBF7] font-sans">
                                 {booking.name || 'Unnamed Client'}
@@ -707,7 +819,7 @@ export default function App() {
                               </p>
                             </div>
 
-                            <div className="space-y-1 pt-1 text-[#FDFBF7]/80">
+                            <div className="space-y-1.5 pt-1 text-[#FDFBF7]/80">
                               <p className="flex items-center gap-1.5">
                                 <Phone className="w-3.5 h-3.5 text-[#C2D8C4]" />
                                 <a
@@ -749,9 +861,98 @@ export default function App() {
                             {booking.notes && (
                               <div className="pt-2 border-t border-[#FDFBF7]/10 text-[11px] text-[#FDFBF7]/60">
                                 <strong className="text-[#FDFBF7] block">Notes:</strong>
-                                <p className="line-clamp-3">{booking.notes}</p>
+                                <p className="line-clamp-2">{booking.notes}</p>
                               </div>
                             )}
+
+                            {/* INTAKE QUESTIONNAIRE ANSWERS (Q1 - Q6) */}
+                            <div className="pt-2 border-t border-[#FDFBF7]/15">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedIntakeSlot((cur) => (cur === slotId ? null : slotId))
+                                }
+                                className="w-full flex items-center justify-between text-left py-1 text-[11px] font-bold text-[#C2D8C4] hover:text-[#FDFBF7] cursor-pointer"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <FileText className="w-3 h-3" />
+                                  Intake Answers (Q1–Q6)
+                                </span>
+                                {isIntakeOpen ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              {isIntakeOpen && (
+                                <div className="mt-2.5 p-3 border border-[#FDFBF7]/20 bg-[#121214] space-y-3 text-[11px] font-mono leading-relaxed text-[#FDFBF7]/85">
+                                  {booking.q1BrandPersonality && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q1: Brand Personality
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90">{booking.q1BrandPersonality}</p>
+                                    </div>
+                                  )}
+
+                                  {booking.q2FavoriteWebsites && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q2: Inspiration Websites
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90 italic">
+                                        &ldquo;{booking.q2FavoriteWebsites}&rdquo;
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {booking.q3PrimaryGoal && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q3: Primary 5-Second Goal
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90">{booking.q3PrimaryGoal}</p>
+                                    </div>
+                                  )}
+
+                                  {booking.q4ContentReliance && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q4: Content Types
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90">{booking.q4ContentReliance}</p>
+                                    </div>
+                                  )}
+
+                                  {booking.q5TargetAudience && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q5: Target Customer &amp; Tech Savviness
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90">{booking.q5TargetAudience}</p>
+                                    </div>
+                                  )}
+
+                                  {booking.q6VisualAssetsScope && (
+                                    <div>
+                                      <span className="text-[#C2D8C4] font-bold block mb-1">
+                                        Q6: Visual Assets Scope
+                                      </span>
+                                      <p className="text-[#FDFBF7]/90">{booking.q6VisualAssetsScope}</p>
+                                    </div>
+                                  )}
+
+                                  {!booking.q1BrandPersonality &&
+                                    !booking.q2FavoriteWebsites &&
+                                    !booking.q3PrimaryGoal && (
+                                      <p className="text-[#FDFBF7]/50 italic">
+                                        No intake responses recorded for this entry.
+                                      </p>
+                                    )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <div className="py-4 text-xs font-mono text-[#FDFBF7]/60">
@@ -764,7 +965,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleAdminDeleteBooking(slotId)}
-                          className="w-full inline-flex items-center justify-center gap-2 border border-red-500/50 hover:bg-red-950/40 text-red-300 py-2.5 px-3 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer"
+                          className="w-full inline-flex items-center justify-center gap-2 border border-red-500/50 hover:bg-red-950/40 text-red-300 py-2.5 px-3 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer mt-2"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Clear Booking &amp; Free Slot</span>
@@ -1137,12 +1338,12 @@ export default function App() {
           />
         </section>
 
-        {/* 6. CLIENT BOOKING (MAX 5 BOOKINGS AT A TIME) */}
+        {/* 6. CLIENT BOOKING & INTAKE QUESTIONNAIRE */}
         <section
           id="book"
           className="max-w-6xl mx-auto px-6 py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
         >
-          <div className="max-w-xl mx-auto bg-[#FDFBF7] border border-[#121214] p-7 sm:p-10">
+          <div className="max-w-3xl mx-auto bg-[#FDFBF7] border border-[#121214] p-7 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <h2 className="text-2xl sm:text-3xl font-black tracking-tighter text-[#121214]">
                 Book Your Build
@@ -1152,9 +1353,10 @@ export default function App() {
               </span>
             </div>
             <p className="text-xs sm:text-sm text-[#3A403C] mb-6">
-              We take a maximum of 5 bookings at a time. Drop your budget, phone number, and email—we reach out directly within a couple days.
+              We take a maximum of 5 builds at a time. Complete your basic details and the 6-question design intake—we reach out directly within a couple days.
             </p>
 
+            {/* CART SUMMARY */}
             {totalItemsInCart > 0 && (
               <div className="mb-6 pb-4 border-b border-[#121214]/15 space-y-2">
                 <div className="flex flex-wrap gap-1.5">
@@ -1200,10 +1402,10 @@ export default function App() {
                 <div className="p-5 bg-[#C2D8C4]/40 border border-[#121214] space-y-2">
                   <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#121214]">
                     <Check className="w-4 h-4" />
-                    <span>Booked</span>
+                    <span>Intake &amp; Booking Confirmed</span>
                   </div>
                   <p className="text-base font-bold text-[#121214] leading-snug">
-                    You are going to hear from us again within a couple days — we will contact and reach out to you directly.
+                    Your project details and questionnaire answers have been logged into our studio pipeline. You will hear from us directly within a couple days.
                   </p>
                 </div>
                 <button
@@ -1224,101 +1426,345 @@ export default function App() {
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleBookingSubmit} noValidate className="space-y-4">
+              <div className="space-y-6">
+                {/* STEP INDICATOR */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setBookingStep(1)}
+                    className={`py-2 px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer ${
+                      bookingStep === 1
+                        ? 'bg-[#121214] text-[#FDFBF7]'
+                        : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/30'
+                    }`}
+                  >
+                    1. Contact &amp; Budget
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (validateStep1()) setBookingStep(2);
+                    }}
+                    className={`py-2 px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer ${
+                      bookingStep === 2
+                        ? 'bg-[#121214] text-[#FDFBF7]'
+                        : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/30'
+                    }`}
+                  >
+                    2. Design Questionnaire (Q1–Q6)
+                  </button>
+                </div>
+
                 {error && (
                   <div className="p-2.5 border border-[#121214] bg-[#C2D8C4]/40 text-xs font-mono text-[#121214]">
                     {error}
                   </div>
                 )}
 
-                <div>
-                  <label htmlFor="book-budget" className="block text-xs font-bold text-[#121214] mb-1">
-                    Your Budget (₹) *
-                  </label>
-                  <input
-                    id="book-budget"
-                    type="text"
-                    required
-                    maxLength={120}
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. ₹35,000 or ₹1,00,000"
-                    className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
-                  />
-                </div>
+                {/* STEP 1: CONTACT & BUDGET */}
+                {bookingStep === 1 && (
+                  <form onSubmit={handleProceedToIntake} noValidate className="space-y-4">
+                    <div>
+                      <label
+                        htmlFor="book-budget"
+                        className="block text-xs font-bold text-[#121214] mb-1"
+                      >
+                        Your Budget (₹) *
+                      </label>
+                      <input
+                        id="book-budget"
+                        type="text"
+                        required
+                        maxLength={120}
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        placeholder="e.g. ₹35,000 or ₹1,00,000"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="book-phone" className="block text-xs font-bold text-[#121214] mb-1">
-                      Phone Number *
-                    </label>
-                    <input
-                      id="book-phone"
-                      type="tel"
-                      required
-                      maxLength={40}
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
-                    />
-                  </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label
+                          htmlFor="book-phone"
+                          className="block text-xs font-bold text-[#121214] mb-1"
+                        >
+                          Phone Number *
+                        </label>
+                        <input
+                          id="book-phone"
+                          type="tel"
+                          required
+                          maxLength={40}
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                        />
+                      </div>
 
-                  <div>
-                    <label htmlFor="book-email" className="block text-xs font-bold text-[#121214] mb-1">
-                      Email *
-                    </label>
-                    <input
-                      id="book-email"
-                      type="email"
-                      required
-                      maxLength={160}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@company.com"
-                      className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
-                    />
-                  </div>
-                </div>
+                      <div>
+                        <label
+                          htmlFor="book-email"
+                          className="block text-xs font-bold text-[#121214] mb-1"
+                        >
+                          Email *
+                        </label>
+                        <input
+                          id="book-email"
+                          type="email"
+                          required
+                          maxLength={160}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@company.com"
+                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <label htmlFor="book-name" className="block text-xs font-bold text-[#121214] mb-1">
-                    Name / Business
-                  </label>
-                  <input
-                    id="book-name"
-                    type="text"
-                    maxLength={160}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none"
-                  />
-                </div>
+                    <div>
+                      <label
+                        htmlFor="book-name"
+                        className="block text-xs font-bold text-[#121214] mb-1"
+                      >
+                        Name / Business
+                      </label>
+                      <input
+                        id="book-name"
+                        type="text"
+                        maxLength={160}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Your name or company"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none"
+                      />
+                    </div>
 
-                <div>
-                  <label htmlFor="book-notes" className="block text-xs font-bold text-[#121214] mb-1">
-                    What do you need built?
-                  </label>
-                  <textarea
-                    id="book-notes"
-                    rows={3}
-                    maxLength={1500}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Tell us about your business and what you want on the site..."
-                    className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
-                  />
-                </div>
+                    <div>
+                      <label
+                        htmlFor="book-notes"
+                        className="block text-xs font-bold text-[#121214] mb-1"
+                      >
+                        What do you need built? (Summary)
+                      </label>
+                      <textarea
+                        id="book-notes"
+                        rows={3}
+                        maxLength={1500}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Tell us briefly about your business, products, or service goals..."
+                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                      />
+                    </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none py-4 transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                >
-                  {submitting ? 'Booking...' : 'Book Now'}
-                </button>
-              </form>
+                    <button
+                      type="submit"
+                      className="w-full inline-flex items-center justify-center gap-2 bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none py-4 transition-opacity hover:opacity-90 cursor-pointer"
+                    >
+                      <span>Continue to Design Questionnaire</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                )}
+
+                {/* STEP 2: INTAKE QUESTIONNAIRE (Q1 - Q6) */}
+                {bookingStep === 2 && (
+                  <form
+                    id="intake-questionnaire"
+                    onSubmit={handleBookingSubmit}
+                    noValidate
+                    className="space-y-8 pt-2"
+                  >
+                    {/* Q1 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                          Q1: Brand Personality
+                        </span>
+                        <span className="text-[11px] font-mono text-[#3A403C]">
+                          Selected {q1Selected.length} / 3
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        If your brand walked into a room, how would you describe its personality? (Select up to 3)
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {Q1_OPTIONS.map((opt) => {
+                          const isSel = q1Selected.includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => toggleQ1(opt)}
+                              className={`p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#121214] text-[#FDFBF7] font-bold'
+                                  : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
+                              }`}
+                            >
+                              • {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Q2 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                        Q2: Inspiration Websites
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        Can you share 2–3 websites you love and explain what you like about them?
+                      </p>
+                      <textarea
+                        rows={3}
+                        maxLength={1500}
+                        value={q2Websites}
+                        onChange={(e) => setQ2Websites(e.target.value)}
+                        placeholder="e.g., Apple.com because of its smooth product animations, or Stripe.com because of its clean layout."
+                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-xs sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    {/* Q3 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                        Q3: Primary 5-Second Goal
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        What is the number one action you want a visitor to take within 5 seconds of landing on your site? (Select one)
+                      </p>
+                      <div className="space-y-2 pt-1">
+                        {Q3_OPTIONS.map((opt) => {
+                          const isSel = q3Goal === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setQ3Goal(opt)}
+                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#121214] text-[#FDFBF7] font-bold'
+                                  : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
+                              }`}
+                            >
+                              ({isSel ? '●' : ' '}) {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Q4 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                        Q4: Content Structure
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        How heavily does your business rely on content, and what type is it? (Select all that apply)
+                      </p>
+                      <div className="space-y-2 pt-1">
+                        {Q4_OPTIONS.map((opt) => {
+                          const isSel = q4Content.includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => toggleQ4(opt)}
+                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#121214] text-[#FDFBF7] font-bold'
+                                  : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
+                              }`}
+                            >
+                              [{isSel ? '✓' : ' '}] {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Q5 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                        Q5: Target Customer &amp; Tech Savviness
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        Who is your primary target customer, and how tech-savvy are they? (Select one)
+                      </p>
+                      <div className="space-y-2 pt-1">
+                        {Q5_OPTIONS.map((opt) => {
+                          const isSel = q5Audience === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setQ5Audience(opt)}
+                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#121214] text-[#FDFBF7] font-bold'
+                                  : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
+                              }`}
+                            >
+                              ({isSel ? '●' : ' '}) {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Q6 */}
+                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                      <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
+                        Q6: Visual Assets Readiness
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-[#121214]">
+                        What is the scope of your visual assets ready for day one? (Select one)
+                      </p>
+                      <div className="space-y-2 pt-1">
+                        {Q6_OPTIONS.map((opt) => {
+                          const isSel = q6Assets === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setQ6Assets(opt)}
+                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#121214] text-[#FDFBF7] font-bold'
+                                  : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
+                              }`}
+                            >
+                              ({isSel ? '●' : ' '}) {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setBookingStep(1)}
+                        className="w-full sm:w-auto border border-[#121214] bg-[#FDFBF7] text-[#121214] font-black uppercase text-xs tracking-widest rounded-none py-4 px-6 hover:bg-[#C2D8C4]/40 cursor-pointer"
+                      >
+                        ← Back to Details
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex-1 w-full bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none py-4 transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                      >
+                        {submitting ? 'Submitting & Booking...' : 'Submit Questionnaire & Book Slot'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             )}
           </div>
         </section>

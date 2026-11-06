@@ -50,7 +50,12 @@ service cloud.firestore {
 
     function isValidBooking(data, slotId) {
       return data.keys().hasAll(['slotId', 'clientId', 'budget', 'phoneNumber', 'email', 'name', 'notes', 'itemsSummary', 'cartTotal', 'createdAt'])
-        && data.keys().hasOnly(['slotId', 'clientId', 'budget', 'phoneNumber', 'email', 'name', 'notes', 'itemsSummary', 'cartTotal', 'createdAt'])
+        && data.keys().hasOnly([
+          'slotId', 'clientId', 'budget', 'phoneNumber', 'email', 'name', 'notes',
+          'itemsSummary', 'cartTotal', 'createdAt',
+          'q1BrandPersonality', 'q2FavoriteWebsites', 'q3PrimaryGoal',
+          'q4ContentReliance', 'q5TargetAudience', 'q6VisualAssetsScope'
+        ])
         && data.slotId is string && data.slotId.size() == 6 && data.slotId == slotId
         && data.clientId is string && data.clientId.size() >= 1 && data.clientId.size() <= 128 && data.clientId.matches('^[a-zA-Z0-9_\\-]+$')
         && data.clientId == request.auth.uid
@@ -61,6 +66,12 @@ service cloud.firestore {
         && data.notes is string && data.notes.size() <= 1500
         && data.itemsSummary is string && data.itemsSummary.size() <= 800
         && data.cartTotal is number && data.cartTotal >= 0 && data.cartTotal <= 100000000
+        && (!('q1BrandPersonality' in data) || (data.q1BrandPersonality is string && data.q1BrandPersonality.size() <= 400))
+        && (!('q2FavoriteWebsites' in data) || (data.q2FavoriteWebsites is string && data.q2FavoriteWebsites.size() <= 1500))
+        && (!('q3PrimaryGoal' in data) || (data.q3PrimaryGoal is string && data.q3PrimaryGoal.size() <= 300))
+        && (!('q4ContentReliance' in data) || (data.q4ContentReliance is string && data.q4ContentReliance.size() <= 500))
+        && (!('q5TargetAudience' in data) || (data.q5TargetAudience is string && data.q5TargetAudience.size() <= 400))
+        && (!('q6VisualAssetsScope' in data) || (data.q6VisualAssetsScope is string && data.q6VisualAssetsScope.size() <= 400))
         && data.createdAt is timestamp && data.createdAt == request.time;
     }
 
