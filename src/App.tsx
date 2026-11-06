@@ -3,13 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Eye,
   EyeOff,
@@ -196,6 +198,34 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [expandedIntakeSlot, setExpandedIntakeSlot] = useState<SlotId | null>(null);
+
+  // Mobile Side-by-Side Plans Carousel State
+  const plansScrollRef = useRef<HTMLDivElement>(null);
+  const [activePlanMobileIdx, setActivePlanMobileIdx] = useState(0);
+
+  const scrollToPlanIndex = (idx: number) => {
+    const clamped = Math.max(0, Math.min(PLANS.length - 1, idx));
+    setActivePlanMobileIdx(clamped);
+    if (plansScrollRef.current) {
+      const children = plansScrollRef.current.children;
+      if (children && children[clamped]) {
+        (children[clamped] as HTMLElement).scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest',
+        });
+      }
+    }
+  };
+
+  const handlePlansScroll = () => {
+    if (!plansScrollRef.current) return;
+    const container = plansScrollRef.current;
+    const scrollLeft = container.scrollLeft;
+    const cardWidth = container.clientWidth * 0.84;
+    const newIdx = Math.round(scrollLeft / (cardWidth + 14));
+    setActivePlanMobileIdx(Math.max(0, Math.min(PLANS.length - 1, newIdx)));
+  };
 
   const selectedPlans = PLANS.filter((p) => selectedPlanIds.includes(p.id));
   const selectedAddOns = CORE_ADDONS.filter((a) => cartAddOnIds.includes(a.id));
@@ -558,31 +588,32 @@ export default function App() {
       <div className="min-h-screen bg-[#121214] text-[#FDFBF7] selection:bg-[#C2D8C4] selection:text-[#121214] flex flex-col font-sans">
         {/* TOP ADMIN HEADER */}
         <header className="border-b border-[#FDFBF7]/15 bg-[#121214]/90 backdrop-blur-sm sticky top-0 z-30">
-          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
               <span className="font-mono text-xs font-black tracking-widest uppercase bg-[#FDFBF7] text-[#121214] px-2 py-0.5">
                 KANNVVAS
               </span>
               <span className="font-mono text-xs text-[#FDFBF7]/60 tracking-wider">
-                /admin portal
+                /admin
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => navigateTo('/')}
                 className="inline-flex items-center gap-1.5 text-xs font-mono text-[#FDFBF7]/70 hover:text-[#FDFBF7] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Return to Site</span>
+                <span className="hidden sm:inline">Return to Site</span>
+                <span className="sm:hidden">Exit</span>
               </button>
 
               {isPasscodeUnlocked && (
                 <button
                   type="button"
                   onClick={handleLockAdmin}
-                  className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] bg-transparent text-[#FDFBF7] px-3 py-1.5 text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer"
+                  className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] bg-transparent text-[#FDFBF7] px-3 py-1 text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer"
                 >
                   Lock
                 </button>
@@ -593,8 +624,8 @@ export default function App() {
 
         {/* PASSCODE GATE: Zayden@08 */}
         {!isPasscodeUnlocked ? (
-          <main className="flex-1 flex items-center justify-center p-6">
-            <div className="max-w-md w-full border border-[#FDFBF7]/20 bg-[#1A1C1A] p-8 sm:p-10 shadow-2xl space-y-6">
+          <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+            <div className="max-w-md w-full border border-[#FDFBF7]/20 bg-[#1A1C1A] p-6 sm:p-10 shadow-2xl space-y-6">
               <div className="space-y-2 text-center">
                 <div className="inline-flex items-center justify-center w-12 h-12 border border-[#FDFBF7]/30 bg-[#121214] text-[#FDFBF7] mb-2">
                   <KeyRound className="w-6 h-6" />
@@ -666,7 +697,7 @@ export default function App() {
           </main>
         ) : (
           /* UNLOCKED ADMIN DASHBOARD */
-          <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-10 space-y-8">
+          <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-8">
             {/* TOP BAR / STATS */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#FDFBF7]/15 pb-6">
               <div>
@@ -989,12 +1020,13 @@ export default function App() {
     <div className="min-h-screen bg-[#C2D8C4] text-[#121214] selection:bg-[#121214] selection:text-[#FDFBF7]">
       {/* HEADER */}
       <header className="sticky top-0 z-30 bg-[#C2D8C4]/95 backdrop-blur-sm border-b-[0.5px] border-[#121214]/15">
-        <div className="max-w-6xl mx-auto px-6 py-3 min-h-16 flex flex-wrap items-center justify-between gap-4">
-          <a href="#top" className="text-lg font-black tracking-tighter text-[#121214]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 min-h-14 sm:min-h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <a href="#top" className="text-base sm:text-lg font-black tracking-tighter text-[#121214] shrink-0">
             KANNVVAS
           </a>
 
-          <nav className="flex flex-wrap items-center gap-4 sm:gap-5">
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-5">
             <button
               type="button"
               onClick={() => scrollToSection('what-we-do')}
@@ -1032,11 +1064,23 @@ export default function App() {
               <span>Our credentials</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
+          </nav>
+
+          {/* Action Buttons (Compact & Touch Friendly on Phone) */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <a
+              href={CREDENTIALS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="md:hidden text-[11px] font-bold text-[#121214] border-b border-[#121214] pb-0.5"
+            >
+              Credentials
+            </a>
 
             <button
               type="button"
               onClick={() => setIsCartDrawerOpen(true)}
-              className="inline-flex items-center gap-2 border border-[#121214] bg-[#FDFBF7] px-3 py-1.5 text-xs font-mono font-bold text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 sm:gap-2 border border-[#121214] bg-[#FDFBF7] px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer"
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               <span>{totalItemsInCart}</span>
@@ -1045,17 +1089,49 @@ export default function App() {
             <button
               type="button"
               onClick={() => scrollToSection('book')}
-              className="bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none px-4 py-2 cursor-pointer"
+              className="bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none px-3.5 sm:px-4 py-2 cursor-pointer"
             >
               BOOK
             </button>
-          </nav>
+          </div>
+        </div>
+
+        {/* Mobile Quick-Jump Strip */}
+        <div className="md:hidden flex items-center gap-1.5 px-4 py-1.5 border-t border-[#121214]/10 overflow-x-auto scrollbar-none text-[11px] font-mono font-bold text-[#121214] bg-[#C2D8C4]/60">
+          <button
+            type="button"
+            onClick={() => scrollToSection('main-options')}
+            className="whitespace-nowrap px-2 py-0.5 border border-[#121214]/30 bg-[#FDFBF7] text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] cursor-pointer"
+          >
+            Plans (Side by Side)
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('belt')}
+            className="whitespace-nowrap px-2 py-0.5 border border-[#121214]/30 bg-[#FDFBF7] text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] cursor-pointer"
+          >
+            Belt
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('what-we-do')}
+            className="whitespace-nowrap px-2 py-0.5 border border-[#121214]/30 bg-[#FDFBF7] text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] cursor-pointer"
+          >
+            What We Do
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('why-us')}
+            className="whitespace-nowrap px-2 py-0.5 border border-[#121214]/30 bg-[#FDFBF7] text-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7] cursor-pointer"
+          >
+            Why Us
+          </button>
         </div>
       </header>
 
       <main id="top">
         {/* 1. FULL-VIEWPORT LANDING HERO */}
-        <section className="min-h-[calc(100vh-4rem)] max-w-6xl mx-auto px-6 py-12 flex flex-col items-center justify-center text-center border-b-[0.5px] border-[#121214]/15">
+        <section className="min-h-[calc(100vh-4rem)] max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 flex flex-col items-center justify-center text-center border-b-[0.5px] border-[#121214]/15 overflow-hidden">
           <a
             href={CREDENTIALS_URL}
             target="_blank"
@@ -1068,18 +1144,18 @@ export default function App() {
 
           <HandWrittenTitle title="The next big conversion engineering studio" />
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3 w-full max-w-xs sm:max-w-none">
             <button
               type="button"
               onClick={() => scrollToSection('main-options')}
-              className="bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none px-7 py-3.5 cursor-pointer"
+              className="w-full sm:w-auto bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none px-7 py-3.5 cursor-pointer text-center"
             >
               SEE MAIN OPTIONS ↓
             </button>
             <button
               type="button"
               onClick={() => scrollToSection('belt')}
-              className="bg-[#FDFBF7] text-[#121214] border border-[#121214] font-black uppercase text-xs tracking-widest rounded-none px-7 py-3.5 hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer"
+              className="w-full sm:w-auto bg-[#FDFBF7] text-[#121214] border border-[#121214] font-black uppercase text-xs tracking-widest rounded-none px-7 py-3.5 hover:bg-[#121214] hover:text-[#FDFBF7] transition-colors cursor-pointer text-center"
             >
               OPEN THE BELT ↓
             </button>
@@ -1089,24 +1165,24 @@ export default function App() {
         {/* 2. WHAT WE DO — ANIMATED ON SCROLL WITH GSAP + REACT TEXTBLOCKANIMATION */}
         <section
           id="what-we-do"
-          className="max-w-6xl mx-auto px-6 py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
+          className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
         >
-          <div className="mb-12 max-w-3xl">
-            <p className="text-xs font-mono uppercase tracking-widest text-[#3A403C] mb-3">
+          <div className="mb-8 sm:mb-12 max-w-3xl">
+            <p className="text-xs font-mono uppercase tracking-widest text-[#3A403C] mb-2 sm:mb-3">
               What We Do
             </p>
             <TextBlockAnimation blockColor="#121214" animateOnScroll={true} duration={0.7}>
-              <h2 className="text-3xl sm:text-5xl font-black tracking-tighter leading-tight text-[#121214]">
+              <h2 className="text-2xl sm:text-5xl font-black tracking-tighter leading-tight text-[#121214]">
                 We build websites that turn visitors into phone calls, WhatsApp messages, and paid orders.
               </h2>
             </TextBlockAnimation>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#FDFBF7] border border-[#121214] p-7 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-[#FDFBF7] border border-[#121214] p-5 sm:p-7 space-y-3 sm:space-y-4">
               <span className="text-xs font-mono font-bold text-[#3A403C] block">01</span>
               <TextBlockAnimation blockColor="#121214" animateOnScroll={true} duration={0.55}>
-                <h3 className="text-xl font-black tracking-tight text-[#121214]">
+                <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#121214]">
                   Custom Frontends Drawn From Scratch
                 </h3>
               </TextBlockAnimation>
@@ -1116,16 +1192,16 @@ export default function App() {
                 stagger={0.04}
                 duration={0.5}
               >
-                <p className="text-sm text-[#3A403C] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#3A403C] leading-relaxed">
                   We don’t slap your logo onto a slow WordPress theme. Every page is designed and coded around your product or service so it loads fast on mobile, looks sharp on every screen, and keeps people from bouncing.
                 </p>
               </TextBlockAnimation>
             </div>
 
-            <div className="bg-[#FDFBF7] border border-[#121214] p-7 space-y-4">
+            <div className="bg-[#FDFBF7] border border-[#121214] p-5 sm:p-7 space-y-3 sm:space-y-4">
               <span className="text-xs font-mono font-bold text-[#3A403C] block">02</span>
               <TextBlockAnimation blockColor="#121214" animateOnScroll={true} duration={0.55}>
-                <h3 className="text-xl font-black tracking-tight text-[#121214]">
+                <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#121214]">
                   Lead Capture &amp; One-Tap WhatsApp Flows
                 </h3>
               </TextBlockAnimation>
@@ -1135,16 +1211,16 @@ export default function App() {
                 stagger={0.04}
                 duration={0.5}
               >
-                <p className="text-sm text-[#3A403C] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#3A403C] leading-relaxed">
                   Most websites bury their contact info three clicks deep. We structure your service pages, galleries, and inquiry forms around how your customers actually buy—with direct WhatsApp buttons and clean lead capture.
                 </p>
               </TextBlockAnimation>
             </div>
 
-            <div className="bg-[#FDFBF7] border border-[#121214] p-7 space-y-4">
+            <div className="bg-[#FDFBF7] border border-[#121214] p-5 sm:p-7 space-y-3 sm:space-y-4">
               <span className="text-xs font-mono font-bold text-[#3A403C] block">03</span>
               <TextBlockAnimation blockColor="#121214" animateOnScroll={true} duration={0.55}>
-                <h3 className="text-xl font-black tracking-tight text-[#121214]">
+                <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#121214]">
                   Payments, Checkout &amp; Analytics
                 </h3>
               </TextBlockAnimation>
@@ -1154,7 +1230,7 @@ export default function App() {
                 stagger={0.04}
                 duration={0.5}
               >
-                <p className="text-sm text-[#3A403C] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#3A403C] leading-relaxed">
                   When your business needs to collect money online, we integrate and test your payment gateway, lock down SSL and security, and set up conversion tracking so you can see which pages actually bring in revenue.
                 </p>
               </TextBlockAnimation>
@@ -1165,20 +1241,20 @@ export default function App() {
         {/* 3. WHY WE BUILD */}
         <section
           id="why-us"
-          className="max-w-6xl mx-auto px-6 py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
+          className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
         >
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
             <div className="lg:col-span-5">
               <p className="text-xs font-mono uppercase tracking-widest text-[#3A403C] mb-2">
                 Why We Build
               </p>
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-[#121214]">
+              <h2 className="text-2xl sm:text-4xl font-black tracking-tighter text-[#121214]">
                 Why we started KANNVVAS.
               </h2>
             </div>
 
-            <div className="lg:col-span-7 bg-[#FDFBF7] border border-[#121214] p-7 sm:p-9 space-y-5 text-sm sm:text-base text-[#121214] leading-relaxed">
-              <p className="font-bold text-lg">
+            <div className="lg:col-span-7 bg-[#FDFBF7] border border-[#121214] p-5 sm:p-9 space-y-4 sm:space-y-5 text-xs sm:text-base text-[#121214] leading-relaxed">
+              <p className="font-bold text-base sm:text-lg">
                 Right now, if you want a website built for your business, you usually get burned one of two ways.
               </p>
               <p className="text-[#3A403C]">
@@ -1194,41 +1270,104 @@ export default function App() {
           </div>
         </section>
 
-        {/* 4. THE MAIN OPTIONS (ONLY THE 4 MAIN PLANS) */}
+        {/* 4. THE MAIN OPTIONS (ALL 4 PLANS SIDE BY SIDE ON MOBILE & DESKTOP) */}
         <section
           id="main-options"
-          className="max-w-6xl mx-auto px-6 py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
+          className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 md:py-28 border-b-[0.5px] border-[#121214]/15 overflow-hidden"
         >
-          <div className="mb-8 space-y-2">
+          <div className="mb-6 sm:mb-8 space-y-2">
             <p className="text-xs font-mono uppercase tracking-widest text-[#3A403C]">
               Main Options
             </p>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-[#121214]">
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tighter text-[#121214]">
               Pick Your Main Plan
             </h2>
-            <p className="text-xs sm:text-sm font-bold text-[#121214] bg-[#FDFBF7] border border-[#121214] px-4 py-3">
+            <p className="text-xs sm:text-sm font-bold text-[#121214] bg-[#FDFBF7] border border-[#121214] px-3.5 sm:px-4 py-2.5 sm:py-3 leading-snug">
               If you pick the ₹29,999 plan, you get ONLY those features. If you want the ₹64,999 features too, you have to pay the extra ₹64,999.
             </p>
           </div>
 
-          {/* 3 Main Plans */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {PLANS.slice(0, 3).map((plan) => {
+          {/* MOBILE QUICK SWITCHER TABS & CONTROLS */}
+          <div className="lg:hidden mb-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
+                {PLANS.map((plan, idx) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => scrollToPlanIndex(idx)}
+                    className={`px-2.5 py-1 text-xs font-mono font-bold whitespace-nowrap border transition-colors cursor-pointer ${
+                      activePlanMobileIdx === idx
+                        ? 'bg-[#121214] text-[#FDFBF7] border-[#121214]'
+                        : 'bg-[#FDFBF7] text-[#121214] border-[#121214]/30 hover:border-[#121214]'
+                    }`}
+                  >
+                    {plan.priceFormatted}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => scrollToPlanIndex(activePlanMobileIdx - 1)}
+                  disabled={activePlanMobileIdx === 0}
+                  aria-label="Previous plan"
+                  className="p-1.5 border border-[#121214] bg-[#FDFBF7] text-[#121214] disabled:opacity-30 cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToPlanIndex(activePlanMobileIdx + 1)}
+                  disabled={activePlanMobileIdx === PLANS.length - 1}
+                  aria-label="Next plan"
+                  className="p-1.5 border border-[#121214] bg-[#FDFBF7] text-[#121214] disabled:opacity-30 cursor-pointer"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] font-mono text-[#3A403C] px-0.5">
+              <span>← Swipe side by side to compare all 4 plans →</span>
+              <span className="font-bold text-[#121214]">Plan {activePlanMobileIdx + 1} of {PLANS.length}</span>
+            </div>
+          </div>
+
+          {/* ALL 4 PLANS SIDE BY SIDE (HORIZONTAL SNAP ON PHONE, 4-COL GRID ON DESKTOP) */}
+          <div
+            ref={plansScrollRef}
+            onScroll={handlePlansScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none gap-4 pb-4 px-4 -mx-4 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-4 lg:gap-4 xl:gap-5 lg:overflow-visible"
+          >
+            {PLANS.map((plan) => {
               const isSelected = selectedPlanIds.includes(plan.id);
+              const isBundle = plan.id === 'plan-184999';
               return (
                 <div
                   key={plan.id}
                   onClick={() => togglePlan(plan)}
-                  className={`bg-[#FDFBF7] p-6 flex flex-col justify-between cursor-pointer ${
+                  className={`w-[84vw] max-w-[310px] sm:w-[320px] lg:w-auto shrink-0 snap-center bg-[#FDFBF7] p-5 sm:p-6 flex flex-col justify-between cursor-pointer transition-all ${
                     isSelected
-                      ? 'border-2 border-[#121214]'
+                      ? 'border-2 border-[#121214] shadow-md ring-1 ring-[#121214]'
                       : 'border-[0.5px] border-[#121214]/25 hover:border-[#121214]'
                   }`}
                 >
                   <div>
+                    {isBundle ? (
+                      <div className="mb-3 inline-block bg-[#121214] text-[#FDFBF7] text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5">
+                        ★ All 3 Plans Included
+                      </div>
+                    ) : (
+                      <div className="mb-3 inline-block bg-[#C2D8C4]/40 text-[#121214] border border-[#121214]/25 text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5">
+                        Tier 0{plan.tier}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between gap-3 mb-4">
                       <div>
-                        <span className="text-3xl font-black font-mono tabular-nums tracking-tighter text-[#121214] block">
+                        <span className="text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tighter text-[#121214] block">
                           {plan.priceFormatted}
                         </span>
                         <span className="text-xs font-mono font-bold text-[#121214]">
@@ -1238,19 +1377,21 @@ export default function App() {
                       <img
                         src={plan.image}
                         alt={plan.dishName}
-                        className="w-20 h-20 object-contain shrink-0 select-none"
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 select-none"
                       />
                     </div>
 
-                    <p className="text-xs bg-[#C2D8C4]/35 border-l-2 border-[#121214] px-3 py-2 text-[#121214] mb-4">
+                    <p className="text-xs bg-[#C2D8C4]/35 border-l-2 border-[#121214] px-3 py-2 text-[#121214] mb-3 leading-snug">
                       {plan.sushiCorrelation}
                     </p>
 
-                    <p className="text-xs font-bold text-[#121214] mb-3">{plan.tagline}</p>
+                    <p className="text-xs font-bold text-[#121214] mb-3 leading-snug">
+                      {plan.tagline}
+                    </p>
 
-                    <ul className="space-y-2 mb-6 text-xs text-[#3A403C]">
+                    <ul className="space-y-1.5 mb-6 text-xs text-[#3A403C]">
                       {plan.features.map((item) => (
-                        <li key={item}>• {item}</li>
+                        <li key={item} className="leading-tight">• {item}</li>
                       ))}
                     </ul>
                   </div>
@@ -1261,7 +1402,7 @@ export default function App() {
                       e.stopPropagation();
                       togglePlan(plan);
                     }}
-                    className={`w-full font-black uppercase text-xs tracking-widest rounded-none py-3 cursor-pointer ${
+                    className={`w-full font-black uppercase text-xs tracking-widest rounded-none py-3 cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-[#121214] text-[#FDFBF7]'
                         : 'bg-[#FDFBF7] text-[#121214] border border-[#121214] hover:bg-[#121214] hover:text-[#FDFBF7]'
@@ -1274,51 +1415,45 @@ export default function App() {
             })}
           </div>
 
-          {/* ₹1,84,999 All Three Bundle */}
-          {(() => {
-            const bundle = PLANS[3];
-            const isSelected = selectedPlanIds.includes(bundle.id);
-            return (
-              <div
-                onClick={() => togglePlan(bundle)}
-                className={`bg-[#FDFBF7] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${
-                  isSelected
-                    ? 'border-2 border-[#121214]'
-                    : 'border-[0.5px] border-[#121214]/25 hover:border-[#121214]'
+          {/* MOBILE DOT INDICATORS */}
+          <div className="lg:hidden flex justify-center items-center gap-1.5 mt-2">
+            {PLANS.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => scrollToPlanIndex(idx)}
+                aria-label={`Jump to plan ${idx + 1}`}
+                className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  activePlanMobileIdx === idx ? 'w-6 bg-[#121214]' : 'w-2 bg-[#121214]/30'
                 }`}
-              >
-                <div className="flex items-center gap-4">
-                  <img
-                    src={bundle.image}
-                    alt={bundle.dishName}
-                    className="w-20 h-20 object-contain shrink-0 select-none"
-                  />
-                  <div>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tighter text-[#121214]">
-                        {bundle.priceFormatted}
-                      </span>
-                      <span className="text-xs font-mono font-bold text-[#121214]">
-                        · Plate: {bundle.dishName}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#121214] mt-1">{bundle.sushiCorrelation}</p>
-                  </div>
-                </div>
+              />
+            ))}
+          </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    togglePlan(bundle);
-                  }}
-                  className="bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none px-6 py-3.5 whitespace-nowrap cursor-pointer"
-                >
-                  {isSelected ? 'Selected (₹1,84,999)' : 'Select ₹1,84,999'}
-                </button>
-              </div>
-            );
-          })()}
+          {/* QUICK SUMMARY BAR */}
+          <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 bg-[#FDFBF7] border border-[#121214]/20 text-xs font-mono">
+            <div>
+              <span className="text-[#3A403C]">Active Selection: </span>
+              <span className="font-bold text-[#121214]">
+                {selectedPlans.length > 0
+                  ? selectedPlans.map((p) => p.priceFormatted).join(' + ')
+                  : 'No plan selected yet'}
+              </span>
+              {selectedPlans.length > 0 && (
+                <span className="text-[#121214] font-bold block sm:inline sm:ml-2">
+                  (Subtotal: {formatINR(plansSubtotal)})
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollToSection('book')}
+              className="bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest px-4 py-2 text-center cursor-pointer hover:opacity-90 transition-opacity"
+            >
+              Continue to Booking ↓
+            </button>
+          </div>
         </section>
 
         {/* 5. THE BELT — ADDITIONS & PLANS LIVE ON THE BELT */}
@@ -1341,9 +1476,9 @@ export default function App() {
         {/* 6. CLIENT BOOKING & INTAKE QUESTIONNAIRE */}
         <section
           id="book"
-          className="max-w-6xl mx-auto px-6 py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
+          className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 md:py-28 border-b-[0.5px] border-[#121214]/15"
         >
-          <div className="max-w-3xl mx-auto bg-[#FDFBF7] border border-[#121214] p-7 sm:p-10">
+          <div className="max-w-3xl mx-auto bg-[#FDFBF7] border border-[#121214] p-4 sm:p-8 md:p-10">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <h2 className="text-2xl sm:text-3xl font-black tracking-tighter text-[#121214]">
                 Book Your Build
@@ -1399,12 +1534,12 @@ export default function App() {
 
             {submitted ? (
               <div className="space-y-4">
-                <div className="p-5 bg-[#C2D8C4]/40 border border-[#121214] space-y-2">
+                <div className="p-4 sm:p-5 bg-[#C2D8C4]/40 border border-[#121214] space-y-2">
                   <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#121214]">
                     <Check className="w-4 h-4" />
                     <span>Intake &amp; Booking Confirmed</span>
                   </div>
-                  <p className="text-base font-bold text-[#121214] leading-snug">
+                  <p className="text-sm sm:text-base font-bold text-[#121214] leading-snug">
                     Your project details and questionnaire answers have been logged into our studio pipeline. You will hear from us directly within a couple days.
                   </p>
                 </div>
@@ -1417,7 +1552,7 @@ export default function App() {
                 </button>
               </div>
             ) : isAtCapacity ? (
-              <div className="p-5 border border-[#121214] bg-[#C2D8C4]/40 space-y-2">
+              <div className="p-4 sm:p-5 border border-[#121214] bg-[#C2D8C4]/40 space-y-2">
                 <p className="text-sm font-black uppercase tracking-widest text-[#121214]">
                   All 5 Booking Slots Are Full (5 / 5)
                 </p>
@@ -1432,26 +1567,26 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setBookingStep(1)}
-                    className={`py-2 px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer ${
+                    className={`py-2 px-2.5 sm:px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer text-[11px] sm:text-xs ${
                       bookingStep === 1
                         ? 'bg-[#121214] text-[#FDFBF7]'
                         : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/30'
                     }`}
                   >
-                    1. Contact &amp; Budget
+                    1. Details &amp; Budget
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       if (validateStep1()) setBookingStep(2);
                     }}
-                    className={`py-2 px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer ${
+                    className={`py-2 px-2.5 sm:px-3 border border-[#121214] text-center font-bold transition-colors cursor-pointer text-[11px] sm:text-xs ${
                       bookingStep === 2
                         ? 'bg-[#121214] text-[#FDFBF7]'
                         : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/30'
                     }`}
                   >
-                    2. Design Questionnaire (Q1–Q6)
+                    2. Design Intake (Q1–Q6)
                   </button>
                 </div>
 
@@ -1479,7 +1614,7 @@ export default function App() {
                         value={budget}
                         onChange={(e) => setBudget(e.target.value)}
                         placeholder="e.g. ₹35,000 or ₹1,00,000"
-                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
                       />
                     </div>
 
@@ -1499,7 +1634,7 @@ export default function App() {
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
                           placeholder="+91 98765 43210"
-                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
                         />
                       </div>
 
@@ -1518,7 +1653,7 @@ export default function App() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="you@company.com"
-                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                          className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -1537,7 +1672,7 @@ export default function App() {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Your name or company"
-                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-sm text-[#121214] rounded-none focus:outline-none"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] px-3.5 py-2.5 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none"
                       />
                     </div>
 
@@ -1555,13 +1690,13 @@ export default function App() {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Tell us briefly about your business, products, or service goals..."
-                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full inline-flex items-center justify-center gap-2 bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none py-4 transition-opacity hover:opacity-90 cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 bg-[#121214] text-[#FDFBF7] font-black uppercase text-xs tracking-widest rounded-none py-3.5 sm:py-4 transition-opacity hover:opacity-90 cursor-pointer text-center"
                     >
                       <span>Continue to Design Questionnaire</span>
                       <ArrowRight className="w-4 h-4" />
@@ -1575,10 +1710,10 @@ export default function App() {
                     id="intake-questionnaire"
                     onSubmit={handleBookingSubmit}
                     noValidate
-                    className="space-y-8 pt-2"
+                    className="space-y-6 sm:space-y-8 pt-2"
                   >
                     {/* Q1 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                           Q1: Brand Personality
@@ -1598,7 +1733,7 @@ export default function App() {
                               key={opt}
                               type="button"
                               onClick={() => toggleQ1(opt)}
-                              className={`p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                              className={`p-2.5 sm:p-3 text-left text-xs border border-[#121214] transition-colors cursor-pointer min-h-[44px] flex items-center ${
                                 isSel
                                   ? 'bg-[#121214] text-[#FDFBF7] font-bold'
                                   : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
@@ -1612,7 +1747,7 @@ export default function App() {
                     </div>
 
                     {/* Q2 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                         Q2: Inspiration Websites
                       </span>
@@ -1625,12 +1760,12 @@ export default function App() {
                         value={q2Websites}
                         onChange={(e) => setQ2Websites(e.target.value)}
                         placeholder="e.g., Apple.com because of its smooth product animations, or Stripe.com because of its clean layout."
-                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-xs sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
+                        className="w-full bg-[#FDFBF7] border border-[#121214] p-3 text-base sm:text-sm text-[#121214] rounded-none focus:outline-none font-mono"
                       />
                     </div>
 
                     {/* Q3 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                         Q3: Primary 5-Second Goal
                       </span>
@@ -1645,7 +1780,7 @@ export default function App() {
                               key={opt}
                               type="button"
                               onClick={() => setQ3Goal(opt)}
-                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                              className={`w-full p-2.5 sm:p-3 text-left text-xs sm:text-sm border border-[#121214] transition-colors cursor-pointer min-h-[44px] flex items-center ${
                                 isSel
                                   ? 'bg-[#121214] text-[#FDFBF7] font-bold'
                                   : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
@@ -1659,7 +1794,7 @@ export default function App() {
                     </div>
 
                     {/* Q4 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                         Q4: Content Structure
                       </span>
@@ -1674,7 +1809,7 @@ export default function App() {
                               key={opt}
                               type="button"
                               onClick={() => toggleQ4(opt)}
-                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                              className={`w-full p-2.5 sm:p-3 text-left text-xs sm:text-sm border border-[#121214] transition-colors cursor-pointer min-h-[44px] flex items-center ${
                                 isSel
                                   ? 'bg-[#121214] text-[#FDFBF7] font-bold'
                                   : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
@@ -1688,7 +1823,7 @@ export default function App() {
                     </div>
 
                     {/* Q5 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                         Q5: Target Customer &amp; Tech Savviness
                       </span>
@@ -1703,7 +1838,7 @@ export default function App() {
                               key={opt}
                               type="button"
                               onClick={() => setQ5Audience(opt)}
-                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                              className={`w-full p-2.5 sm:p-3 text-left text-xs sm:text-sm border border-[#121214] transition-colors cursor-pointer min-h-[44px] flex items-center ${
                                 isSel
                                   ? 'bg-[#121214] text-[#FDFBF7] font-bold'
                                   : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
@@ -1717,7 +1852,7 @@ export default function App() {
                     </div>
 
                     {/* Q6 */}
-                    <div className="space-y-2.5 p-4 border border-[#121214] bg-[#C2D8C4]/15">
+                    <div className="space-y-2.5 p-3.5 sm:p-4 border border-[#121214] bg-[#C2D8C4]/15">
                       <span className="font-mono text-xs font-black uppercase tracking-wider text-[#121214]">
                         Q6: Visual Assets Readiness
                       </span>
@@ -1732,7 +1867,7 @@ export default function App() {
                               key={opt}
                               type="button"
                               onClick={() => setQ6Assets(opt)}
-                              className={`w-full p-2.5 text-left text-xs border border-[#121214] transition-colors cursor-pointer ${
+                              className={`w-full p-2.5 sm:p-3 text-left text-xs sm:text-sm border border-[#121214] transition-colors cursor-pointer min-h-[44px] flex items-center ${
                                 isSel
                                   ? 'bg-[#121214] text-[#FDFBF7] font-bold'
                                   : 'bg-[#FDFBF7] text-[#121214] hover:bg-[#C2D8C4]/40'
@@ -1745,11 +1880,11 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                       <button
                         type="button"
                         onClick={() => setBookingStep(1)}
-                        className="w-full sm:w-auto border border-[#121214] bg-[#FDFBF7] text-[#121214] font-black uppercase text-xs tracking-widest rounded-none py-4 px-6 hover:bg-[#C2D8C4]/40 cursor-pointer"
+                        className="w-full sm:w-auto border border-[#121214] bg-[#FDFBF7] text-[#121214] font-black uppercase text-xs tracking-widest rounded-none py-3.5 sm:py-4 px-6 hover:bg-[#C2D8C4]/40 cursor-pointer text-center"
                       >
                         ← Back to Details
                       </button>
@@ -1772,13 +1907,13 @@ export default function App() {
 
       {/* FOOTER */}
       <footer className="border-t-[0.5px] border-[#121214]/15">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-[#3A403C]">
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-[#3A403C]">
+          <div className="flex items-center gap-3 sm:gap-4">
             <span className="font-black text-[#121214]">KANNVVAS</span>
             <span>Enterprise Software Studio</span>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4 sm:gap-5">
             <a
               href={CREDENTIALS_URL}
               target="_blank"
@@ -1809,7 +1944,7 @@ export default function App() {
           aria-label="Cart"
           className="fixed inset-0 z-50 bg-[#121214]/70 flex justify-end"
         >
-          <div className="bg-[#FDFBF7] border-l border-[#121214] w-full max-w-sm h-full p-6 flex flex-col justify-between">
+          <div className="bg-[#FDFBF7] border-l border-[#121214] w-full max-w-sm h-full p-5 sm:p-6 flex flex-col justify-between overflow-y-auto">
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#121214]/15">
                 <h2 className="text-base font-black text-[#121214]">Cart ({totalItemsInCart})</h2>
