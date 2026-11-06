@@ -129,9 +129,10 @@ export default function App() {
   // Client-Side Routing: Detect /admin or #admin
   const [pathname, setPathname] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const host = window.location.hostname.toLowerCase();
       const p = window.location.pathname;
       const h = window.location.hash;
-      if (p.startsWith('/admin') || h.includes('admin')) {
+      if (host.startsWith('admin.') || p.startsWith('/admin') || h.includes('admin')) {
         return '/admin';
       }
       return p || '/';
@@ -241,9 +242,10 @@ export default function App() {
   // Handle URL change / Browser back & forward
   useEffect(() => {
     const handlePopState = () => {
+      const host = window.location.hostname.toLowerCase();
       const p = window.location.pathname;
       const h = window.location.hash;
-      if (p.startsWith('/admin') || h.includes('admin')) {
+      if (host.startsWith('admin.') || p.startsWith('/admin') || h.includes('admin')) {
         setPathname('/admin');
       } else {
         setPathname(p || '/');
@@ -1923,15 +1925,6 @@ export default function App() {
               <span>Our credentials</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
-
-            <button
-              type="button"
-              onClick={() => navigateTo('/admin')}
-              className="text-[#3A403C] hover:text-[#121214] hover:underline cursor-pointer flex items-center gap-1"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Admin Console</span>
-            </button>
           </div>
         </div>
       </footer>
