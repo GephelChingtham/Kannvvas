@@ -18,8 +18,6 @@ import {
   FileText,
   KeyRound,
   Lock,
-  LogIn,
-  LogOut,
   Mail,
   Phone,
   ShoppingBag,
@@ -27,10 +25,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   onSnapshot,
   serverTimestamp,
   writeBatch,
@@ -47,10 +43,7 @@ import {
   type PlanOption,
 } from '@/src/data/menu-plates';
 import {
-  ADMIN_EMAIL,
-  auth,
   db,
-  googleProvider,
   handleFirestoreError,
   MAX_BOOKINGS,
   OperationType,
@@ -126,27 +119,33 @@ function formatINR(amount: number): string {
 }
 
 export default function App() {
-  // Client-Side Routing: Detect /admin or #admin
+  // Client-Side Routing: Detect /clientorders (or redirect legacy /admin)
   const [pathname, setPathname] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const host = window.location.hostname.toLowerCase();
       const p = window.location.pathname;
       const h = window.location.hash;
-      if (host.startsWith('admin.') || p.startsWith('/admin') || h.includes('admin')) {
-        return '/admin';
+      if (
+        host.startsWith('clientorders.') ||
+        p.startsWith('/clientorders') ||
+        h.includes('clientorders') ||
+        p.startsWith('/admin') ||
+        h.includes('admin')
+      ) {
+        return '/clientorders';
       }
       return p || '/';
     }
     return '/';
   });
 
-  // Admin Passcode Gate (Zayden@08)
+  // Client Orders Passcode Gate (Zayden@08)
   const [passcodeInput, setPasscodeInput] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
   const [isPasscodeUnlocked, setIsPasscodeUnlocked] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('kannvvas_admin_unlocked') === 'true';
+      return sessionStorage.getItem('kannvvas_clientorders_unlocked') === 'true';
     }
     return false;
   });
@@ -155,12 +154,7 @@ export default function App() {
   const [cartAddOnIds, setCartAddOnIds] = useState<string[]>([]);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
-  // Auth & Admin State
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [isAdminUser, setIsAdminUser] = useState(false);
-
-  // 5-Slot Occupancy & Admin Bookings State
+  // 5-Slot Occupancy & Client Bookings State
   const [occupiedSlots, setOccupiedSlots] = useState<Record<SlotId, boolean>>({
     'slot-1': false,
     'slot-2': false,
@@ -245,8 +239,14 @@ export default function App() {
       const host = window.location.hostname.toLowerCase();
       const p = window.location.pathname;
       const h = window.location.hash;
-      if (host.startsWith('admin.') || p.startsWith('/admin') || h.includes('admin')) {
-        setPathname('/admin');
+      if (
+        host.startsWith('clientorders.') ||
+        p.startsWith('/clientorders') ||
+        h.includes('clientorders') ||
+        p.startsWith('/admin') ||
+        h.includes('admin')
+      ) {
+        setPathname('/clientorders');
       } else {
         setPathname(p || '/');
       }
@@ -267,28 +267,14 @@ export default function App() {
     }
   };
 
-  // Listen to Auth State
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser && currentUser.emailVerified) {
-        if (currentUser.email === ADMIN_EMAIL) {
-          setIsAdminUser(true);
-        } else {
-          try {
-            const adminSnap = await getDoc(doc(db, 'admins', currentUser.uid));
-            setIsAdminUser(adminSnap.exists());
-          } catch {
-            setIsAdminUser(false);
-          }
-        }
-      } else {
-        setIsAdminUser(false);
+  const scrollToSection = (id: string) => {
+    if (typeof document !== 'undefined') {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
       }
-      setAuthReady(true);
-    });
-    return () => unsub();
-  }, []);
+    }
+  };
 
   // Listen to public occupancy of the 5 slots (slot-1 .. slot-5)
   useEffect(() => {
@@ -312,19 +298,8 @@ export default function App() {
     };
   }, []);
 
-  // Listen to the 5 booking documents when signed in as Admin
+  // Listen to the 5 booking documents for client orders in real time
   useEffect(() => {
-    if (!authReady || !isAdminUser) {
-      setAdminBookings({
-        'slot-1': null,
-        'slot-2': null,
-        'slot-3': null,
-        'slot-4': null,
-        'slot-5': null,
-      });
-      return;
-    }
-
     const unsubs = SLOT_IDS.map((slotId) => {
       const path = `bookings/${slotId}`;
       return onSnapshot(
@@ -340,29 +315,24 @@ export default function App() {
         }
       );
     });
-
     return () => {
       unsubs.forEach((u) => u());
     };
-  }, [authReady, isAdminUser]);
-
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   const togglePlan = (plan: PlanOption) => {
     setSubmitted(false);
-    setSelectedPlanIds((prev) => {
-      if (plan.id === 'plan-184999') {
-        return prev.includes('plan-184999') ? [] : ['plan-184999'];
-      }
-      const withoutBundle = prev.filter((id) => id !== 'plan-184999');
-      if (withoutBundle.includes(plan.id)) {
-        return withoutBundle.filter((id) => id !== plan.id);
-      }
-      return [...withoutBundle, plan.id];
-    });
+    setSelectedPlanIds((prev) =>
+      prev.includes(plan.id) ? prev.filter((id) => id !== plan.id) : [...prev, plan.id]
+    );
+  };
+
+  const removePlan = (planId: string) => {
+    setSelectedPlanIds((prev) => prev.filter((id) => id !== planId));
+  };
+
+  const removeAddOn = (addOnId: string) => {
+    setCartAddOnIds((prev) => prev.filter((id) => id !== addOnId));
   };
 
   const toggleAddOn = (id: string) => {
@@ -458,17 +428,11 @@ export default function App() {
 
     setSubmitting(true);
     try {
-      let activeUser = auth.currentUser;
-      if (!activeUser) {
-        const credential = await signInWithPopup(auth, googleProvider);
-        activeUser = credential.user;
-      }
-
-      if (!activeUser) {
-        setError('Please sign in with Google to confirm and save your booking.');
-        setSubmitting(false);
-        return;
-      }
+      const clientId =
+        'client_' +
+        Date.now().toString(36) +
+        '_' +
+        Math.random().toString(36).substring(2, 9);
 
       const itemsSummary = [
         ...selectedPlans.map((p) => `${p.priceFormatted} (${p.dishName})`),
@@ -481,13 +445,13 @@ export default function App() {
       batch.set(doc(db, 'slots', freeSlotId), {
         slotId: freeSlotId,
         occupied: true,
-        clientId: activeUser.uid,
+        clientId,
         updatedAt: serverTimestamp(),
       });
 
       batch.set(doc(db, 'bookings', freeSlotId), {
         slotId: freeSlotId,
-        clientId: activeUser.uid,
+        clientId,
         budget: budget.trim().slice(0, 120),
         phoneNumber: phoneNumber.trim().slice(0, 40),
         email: email.trim().slice(0, 160),
@@ -504,11 +468,7 @@ export default function App() {
         createdAt: serverTimestamp(),
       });
 
-      try {
-        await batch.commit();
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `bookings/${freeSlotId}`);
-      }
+      await batch.commit();
 
       setSubmitted(true);
       setBookingStep(1);
@@ -524,11 +484,8 @@ export default function App() {
       setQ5Audience('');
       setQ6Assets('');
     } catch (err) {
-      if (err instanceof Error && err.message.includes('auth/popup-closed-by-user')) {
-        setError('Sign-in popup was closed before completing your booking.');
-      } else {
-        setError('Could not save booking. Please try again.');
-      }
+      handleFirestoreError(err, OperationType.CREATE, `bookings/${freeSlotId}`);
+      setError('Could not save booking. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -546,22 +503,13 @@ export default function App() {
     }
   };
 
-  const handleAdminSignIn = async () => {
-    setAdminError(null);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch {
-      setAdminError('Sign-in cancelled or failed.');
-    }
-  };
-
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPasscodeError(null);
     if (passcodeInput === REQUIRED_PASSCODE) {
       setIsPasscodeUnlocked(true);
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('kannvvas_admin_unlocked', 'true');
+        sessionStorage.setItem('kannvvas_clientorders_unlocked', 'true');
       }
       setPasscodeInput('');
     } else {
@@ -572,7 +520,7 @@ export default function App() {
   const handleLockAdmin = () => {
     setIsPasscodeUnlocked(false);
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('kannvvas_admin_unlocked');
+      sessionStorage.removeItem('kannvvas_clientorders_unlocked');
     }
   };
 
@@ -583,12 +531,12 @@ export default function App() {
   }));
 
   // ==========================================
-  // DEDICATED ADMIN PORTAL VIEW (/admin)
+  // DEDICATED CLIENT ORDERS PORTAL VIEW (/clientorders)
   // ==========================================
-  if (pathname === '/admin') {
+  if (pathname === '/clientorders' || pathname === '/admin') {
     return (
       <div className="min-h-screen bg-[#121214] text-[#FDFBF7] selection:bg-[#C2D8C4] selection:text-[#121214] flex flex-col font-sans">
-        {/* TOP ADMIN HEADER */}
+        {/* TOP HEADER */}
         <header className="border-b border-[#FDFBF7]/15 bg-[#121214]/90 backdrop-blur-sm sticky top-0 z-30">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -596,7 +544,7 @@ export default function App() {
                 KANNVVAS
               </span>
               <span className="font-mono text-xs text-[#FDFBF7]/60 tracking-wider">
-                /admin
+                /clientorders
               </span>
             </div>
 
@@ -633,10 +581,10 @@ export default function App() {
                   <KeyRound className="w-6 h-6" />
                 </div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#FDFBF7]">
-                  Admin Authorization
+                  Client Orders Authorization
                 </h1>
                 <p className="text-xs font-mono text-[#FDFBF7]/60 tracking-wide">
-                  https://kannvvas.vercel.app/admin
+                  https://kannvvas.vercel.app/clientorders
                 </p>
               </div>
 
@@ -649,14 +597,14 @@ export default function App() {
               <form onSubmit={handlePasscodeSubmit} className="space-y-4">
                 <div>
                   <label
-                    htmlFor="admin-passcode-input"
+                    htmlFor="clientorders-passcode-input"
                     className="block text-xs font-mono uppercase tracking-widest text-[#FDFBF7]/70 mb-2"
                   >
                     Enter Passcode
                   </label>
                   <div className="relative">
                     <input
-                      id="admin-passcode-input"
+                      id="clientorders-passcode-input"
                       type={showPasscode ? 'text' : 'password'}
                       autoFocus
                       required
@@ -698,7 +646,7 @@ export default function App() {
             </div>
           </main>
         ) : (
-          /* UNLOCKED ADMIN DASHBOARD */
+          /* UNLOCKED CLIENT ORDERS DASHBOARD */
           <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-8">
             {/* TOP BAR / STATS */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#FDFBF7]/15 pb-6">
@@ -706,42 +654,25 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="font-mono text-xs uppercase tracking-widest text-[#FDFBF7]/70">
-                    Live System Status
+                    Live Real-Time Orders
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[#FDFBF7] mt-1">
-                  Active Bookings &amp; Questionnaire Intake
+                  Client Orders &amp; Questionnaire Intake
                 </h1>
               </div>
 
               <div className="flex items-center gap-3">
                 <span className="font-mono text-xs uppercase tracking-wider border border-[#FDFBF7]/30 px-3 py-1.5 bg-[#1A1C1A]">
-                  Slots: <strong className="text-[#C2D8C4]">{occupiedCount}</strong> / {MAX_BOOKINGS}
+                  Active Orders: <strong className="text-[#C2D8C4]">{occupiedCount}</strong> / {MAX_BOOKINGS}
                 </span>
-
-                {user ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-[#FDFBF7]/60 hidden sm:inline">
-                      {user.email}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => signOut(auth)}
-                      className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] px-3 py-1.5 text-xs font-mono uppercase tracking-wider cursor-pointer"
-                    >
-                      Sign Out Google
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleAdminSignIn}
-                    className="inline-flex items-center gap-2 bg-[#FDFBF7] text-[#121214] px-4 py-2 text-xs font-mono font-bold tracking-wider uppercase hover:bg-[#C2D8C4] cursor-pointer"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Sync Google Admin</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleLockAdmin}
+                  className="border border-[#FDFBF7]/30 hover:border-[#FDFBF7] bg-transparent text-[#FDFBF7] px-3 py-1 text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  Lock
+                </button>
               </div>
             </div>
 
@@ -750,35 +681,6 @@ export default function App() {
                 {adminError}
               </div>
             )}
-
-            {!user ? (
-              <div className="border border-[#FDFBF7]/20 bg-[#1A1C1A] p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="space-y-1 text-center sm:text-left">
-                  <p className="text-sm font-bold text-[#FDFBF7]">
-                    Passcode verified ({REQUIRED_PASSCODE})
-                  </p>
-                  <p className="text-xs font-mono text-[#FDFBF7]/60">
-                    Connect your admin Google account ({ADMIN_EMAIL}) to unlock real-time Firestore database reads and manage questionnaire answers.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAdminSignIn}
-                  className="bg-[#C2D8C4] text-[#121214] font-black uppercase text-xs tracking-widest px-5 py-3 whitespace-nowrap hover:bg-[#FDFBF7] cursor-pointer"
-                >
-                  Connect {ADMIN_EMAIL}
-                </button>
-              </div>
-            ) : !isAdminUser ? (
-              <div className="border border-amber-500/50 bg-amber-950/30 p-6 space-y-2">
-                <p className="text-sm font-bold text-amber-300">
-                  Logged in as {user.email} (Not Registered as Firebase Admin)
-                </p>
-                <p className="text-xs font-mono text-[#FDFBF7]/70">
-                  Make sure you sign in with the official admin email ({ADMIN_EMAIL}) to view client intake answers.
-                </p>
-              </div>
-            ) : null}
 
             {/* 5-SLOT ARCHITECTURAL PIPELINE */}
             <div className="space-y-4">
@@ -845,61 +747,57 @@ export default function App() {
                           <div className="space-y-3 text-xs font-mono">
                             <div>
                               <p className="text-base font-bold text-[#FDFBF7] font-sans">
-                                {booking.name || 'Unnamed Client'}
+                                {booking.name || 'Client Order'}
                               </p>
                               <p className="text-sm font-black text-[#C2D8C4] mt-0.5">
-                                Budget: {booking.budget}
+                                {formatINR(booking.cartTotal)}
                               </p>
                             </div>
 
-                            <div className="space-y-1.5 pt-1 text-[#FDFBF7]/80">
-                              <p className="flex items-center gap-1.5">
-                                <Phone className="w-3.5 h-3.5 text-[#C2D8C4]" />
+                            <div className="space-y-1 text-[#FDFBF7]/80">
+                              <div className="flex items-center gap-2">
+                                <Phone className="w-3 h-3 text-[#FDFBF7]/50 shrink-0" />
                                 <a
                                   href={`tel:${booking.phoneNumber}`}
-                                  className="hover:underline"
+                                  className="hover:text-[#C2D8C4] underline underline-offset-2"
                                 >
                                   {booking.phoneNumber}
                                 </a>
-                                <a
-                                  href={`https://wa.me/${booking.phoneNumber.replace(/\D/g, '')}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="ml-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2"
-                                >
-                                  WhatsApp
-                                </a>
-                              </p>
-
-                              <p className="flex items-center gap-1.5">
-                                <Mail className="w-3.5 h-3.5 text-[#C2D8C4]" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Mail className="w-3 h-3 text-[#FDFBF7]/50 shrink-0" />
                                 <a
                                   href={`mailto:${booking.email}`}
-                                  className="hover:underline truncate"
+                                  className="hover:text-[#C2D8C4] underline underline-offset-2 break-all"
                                 >
                                   {booking.email}
                                 </a>
-                              </p>
+                              </div>
                             </div>
 
-                            {booking.itemsSummary && (
-                              <div className="pt-2 border-t border-[#FDFBF7]/10 text-[11px] text-[#FDFBF7]/70">
-                                <strong className="text-[#FDFBF7] block">
-                                  Items ({formatINR(booking.cartTotal)}):
-                                </strong>
-                                <span className="line-clamp-2">{booking.itemsSummary}</span>
+                            <div className="pt-2 border-t border-[#FDFBF7]/10 space-y-1 text-[11px]">
+                              <div>
+                                <span className="text-[#FDFBF7]/50">Budget: </span>
+                                <span className="text-[#FDFBF7]">{booking.budget}</span>
                               </div>
-                            )}
+                              {booking.itemsSummary && (
+                                <div>
+                                  <span className="text-[#FDFBF7]/50">Items: </span>
+                                  <span className="text-[#FDFBF7]">{booking.itemsSummary}</span>
+                                </div>
+                              )}
+                              {booking.notes && (
+                                <div className="pt-1">
+                                  <span className="text-[#FDFBF7]/50 block">Notes:</span>
+                                  <p className="text-[#FDFBF7]/80 italic mt-0.5">
+                                    &ldquo;{booking.notes}&rdquo;
+                                  </p>
+                                </div>
+                              )}
+                            </div>
 
-                            {booking.notes && (
-                              <div className="pt-2 border-t border-[#FDFBF7]/10 text-[11px] text-[#FDFBF7]/60">
-                                <strong className="text-[#FDFBF7] block">Notes:</strong>
-                                <p className="line-clamp-2">{booking.notes}</p>
-                              </div>
-                            )}
-
-                            {/* INTAKE QUESTIONNAIRE ANSWERS (Q1 - Q6) */}
-                            <div className="pt-2 border-t border-[#FDFBF7]/15">
+                            {/* INTAKE RESPONSES ACCORDION */}
+                            <div className="pt-2 border-t border-[#FDFBF7]/10">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -989,21 +887,19 @@ export default function App() {
                           </div>
                         ) : (
                           <div className="py-4 text-xs font-mono text-[#FDFBF7]/60">
-                            Occupied slot. Sign in with Google ({ADMIN_EMAIL}) above to load client PII details.
+                            Loading booking details...
                           </div>
                         )}
                       </div>
 
-                      {isAdminUser && (
-                        <button
-                          type="button"
-                          onClick={() => handleAdminDeleteBooking(slotId)}
-                          className="w-full inline-flex items-center justify-center gap-2 border border-red-500/50 hover:bg-red-950/40 text-red-300 py-2.5 px-3 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer mt-2"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Clear Booking &amp; Free Slot</span>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminDeleteBooking(slotId)}
+                        className="w-full inline-flex items-center justify-center gap-2 border border-red-500/50 hover:bg-red-950/40 text-red-300 py-2.5 px-3 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer mt-2"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear Booking &amp; Free Slot</span>
+                      </button>
                     </div>
                   );
                 })}
